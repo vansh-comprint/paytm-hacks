@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
-/* ── Galla design system — Paytm × OctoDeep, DARK navy, OKLCH (never #000/#fff) ── */
+/* ── Galla design system — Paytm × OctoDeep, LIGHT/daylight, OKLCH (never #000/#fff) ── */
 @theme {
-  --color-surface:    oklch(0.185 0.035 260);   /* deep Paytm navy */
-  --color-panel:      oklch(0.232 0.040 260);    /* card */
-  --color-panel-2:    oklch(0.285 0.045 260);    /* raised */
-  --color-ink:        oklch(0.965 0.012 250);    /* near-white */
-  --color-ink-soft:   oklch(0.83 0.022 250);
-  --color-muted:      oklch(0.66 0.030 252);
-  --color-line:       oklch(0.36 0.040 258);
-  --color-line-soft:  oklch(0.31 0.038 258);
+  --color-surface:    oklch(0.992 0.004 240);   /* tinted near-white */
+  --color-panel:      oklch(0.974 0.006 242);   /* card */
+  --color-panel-2:    oklch(0.955 0.008 242);   /* raised */
+  --color-ink:        oklch(0.255 0.045 262);   /* deep navy ink */
+  --color-ink-soft:   oklch(0.40 0.05 260);
+  --color-muted:      oklch(0.56 0.028 252);
+  --color-line:       oklch(0.915 0.013 246);
+  --color-line-soft:  oklch(0.945 0.009 246);
 
-  --color-brand:      oklch(0.74 0.150 232);     /* Paytm cyan, bright on dark */
-  --color-brand-ink:  oklch(0.86 0.110 220);     /* light cyan for contrast text */
-  --color-upi:        oklch(0.73 0.140 234);     /* digital money */
-  --color-cash:       oklch(0.83 0.135 78);      /* the cash Paytm can't see */
-  --color-cash-ink:   oklch(0.86 0.130 80);
-  --color-wa:         oklch(0.75 0.140 152);
-  --color-danger:     oklch(0.68 0.180 22);
+  --color-brand:      oklch(0.72 0.152 233);     /* Paytm cyan */
+  --color-brand-ink:  oklch(0.30 0.10 248);      /* Paytm navy */
+  --color-upi:        oklch(0.66 0.142 236);     /* digital money */
+  --color-cash:       oklch(0.80 0.135 76);      /* the cash Paytm can't see */
+  --color-cash-ink:   oklch(0.50 0.105 64);
+  --color-wa:         oklch(0.66 0.135 152);
+  --color-danger:     oklch(0.62 0.18 25);
 
   --font-display: "Bricolage Grotesque", ui-sans-serif, sans-serif;
   --font-sans:    "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
@@ -27,6 +27,7 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+:root { color-scheme: light; }
 html, body, #root { min-height: 100%; }
 body {
   background: var(--color-surface);
@@ -36,10 +37,10 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* faint constellation dots on the dark navy */
+/* faint counter-paper dots */
 .bg-counter {
-  background-image: radial-gradient(oklch(0.72 0.14 232 / 0.05) 1px, transparent 1.4px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(oklch(0.72 0.15 233 / 0.055) 1px, transparent 1.4px);
+  background-size: 22px 22px;
   background-position: -8px -8px;
 }
 

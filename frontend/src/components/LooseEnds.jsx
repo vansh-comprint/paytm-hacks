@@ -60,7 +60,7 @@ export default function LooseEnds({ todos, onSendReminder, onMarkDone, busyId })
 }
 
 function Row({ icon, tone, children }) {
-  const chip = tone === 'cash' ? 'bg-cash/15 text-cash' : 'bg-brand/15 text-brand';
+  const chip = tone === 'cash' ? 'bg-cash/15 text-cash-ink' : 'bg-brand/15 text-brand';
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius)] border border-line bg-panel px-3.5 py-3">
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${chip}`}>{icon}</span>

@@ -18,7 +18,7 @@ export default function VoiceBar({
 
   return (
     <section aria-label="Talk to Galla" className="grid gap-3">
-      <div className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-panel p-1.5 shadow-[0_1px_0_oklch(1_0_0/0.05)_inset,0_10px_30px_-20px_oklch(0_0_0/0.6)]">
+      <div className="flex items-center gap-2 rounded-[var(--radius)] border border-line bg-panel p-1.5 shadow-[0_1px_0_oklch(1_0_0/0.6)_inset,0_8px_24px_-18px_oklch(0.3_0.1_250/0.5)]">
         <span className="grid h-9 w-9 shrink-0 place-items-center text-brand">
           <AudioLines size={19} strokeWidth={2} />
         </span>
