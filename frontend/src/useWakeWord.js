@@ -27,7 +27,10 @@ export function useWakeWord({ enabled, onWake }) {
     const offs = [];
     const engine = new WakeWordEngine({
       baseAssetUrl: '/openwakeword/models',
-      ortWasmPath: '/openwakeword/ort/', // self-hosted runtime → no CDN, works offline
+      // Load the ORT runtime from jsDelivr (a different origin) so Vite never tries to transform
+      // the .mjs glue as a /public module (that was the dev-server crash). The app needs internet
+      // for Sarvam STT/TTS anyway, so self-hosting ORT bought us nothing.
+      ortWasmPath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/',
       modelFiles: MODEL_FILES,
       keywords: [ACTIVE_KEYWORD],
       detectionThreshold: 0.5,

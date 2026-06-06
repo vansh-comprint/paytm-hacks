@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, Vec3 } from 'ogl';
 
-// Galla's presence — a glossy 3D Paytm-blue orb (Apple-ish): real volume + highlight + rim light,
-// flowing surface, crisp circular edge (no box), no neon. Voice energizes + swells it.
+// Galla's presence — the 21st.dev VoicePoweredOrb (your 21stdev.rtf), ported to JSX and tuned for Galla:
+//   • Paytm-blue palette (was purple/cyan)
+//   • edges fade via ALPHA, not toward black — so it sits on our LIGHT page with no black shadow
+//   • mic-reactive: your voice drives rotation + hover/distortion
+// Everything else (noise undulation, moving light, hue control) is the original orb.
 
 const VERT = /* glsl */ `
   precision highp float;
@@ -12,11 +15,14 @@ const VERT = /* glsl */ `
 
 const FRAG = /* glsl */ `
   precision highp float;
-  uniform float iTime; uniform vec3 iResolution; uniform float uVoice;
+  uniform float iTime; uniform vec3 iResolution; uniform float hue;
+  uniform float hover; uniform float rot; uniform float hoverIntensity;
   varying vec2 vUv;
 
-  vec3 hash33(vec3 p3){ p3=fract(p3*vec3(0.1031,0.11369,0.13787)); p3+=dot(p3,p3.yxz+19.19);
-    return -1.0+2.0*fract(vec3(p3.x+p3.y,p3.x+p3.z,p3.y+p3.z)*p3.zyx); }
+  vec3 rgb2yiq(vec3 c){ float y=dot(c,vec3(0.299,0.587,0.114)); float i=dot(c,vec3(0.596,-0.274,-0.322)); float q=dot(c,vec3(0.211,-0.523,0.312)); return vec3(y,i,q); }
+  vec3 yiq2rgb(vec3 c){ float r=c.x+0.956*c.y+0.621*c.z; float g=c.x-0.272*c.y-0.647*c.z; float b=c.x-1.106*c.y+1.703*c.z; return vec3(r,g,b); }
+  vec3 adjustHue(vec3 color, float hueDeg){ float h=hueDeg*3.14159265/180.0; vec3 yiq=rgb2yiq(color); float c=cos(h),s=sin(h); float i=yiq.y*c-yiq.z*s; float q=yiq.y*s+yiq.z*c; yiq.y=i; yiq.z=q; return yiq2rgb(yiq); }
+  vec3 hash33(vec3 p3){ p3=fract(p3*vec3(0.1031,0.11369,0.13787)); p3+=dot(p3,p3.yxz+19.19); return -1.0+2.0*fract(vec3(p3.x+p3.y,p3.x+p3.z,p3.y+p3.z)*p3.zyx); }
   float snoise3(vec3 p){ const float K1=0.333333333; const float K2=0.166666667;
     vec3 i=floor(p+(p.x+p.y+p.z)*K1); vec3 d0=p-(i-(i.x+i.y+i.z)*K2);
     vec3 e=step(vec3(0.0),d0-d0.yzx); vec3 i1=e*(1.0-e.zxy); vec3 i2=1.0-e.zxy*(1.0-e);
@@ -25,61 +31,66 @@ const FRAG = /* glsl */ `
     vec4 n=h*h*h*h*vec4(dot(d0,hash33(i)),dot(d1,hash33(i+i1)),dot(d2,hash33(i+i2)),dot(d3,hash33(i+1.0)));
     return dot(vec4(31.316),n); }
 
-  void main() {
-    vec2 fragCoord = vUv * iResolution.xy;
-    vec2 center = iResolution.xy * 0.5;
-    float size = min(iResolution.x, iResolution.y);
-    vec2 p = (fragCoord - center) / size * 2.0;
+  // Paytm-blue palette (original was purple / cyan / deep-blue)
+  // light-only Paytm blues -> no dark/grey region anywhere (so no shadow on the white page)
+  const vec3 baseColor1 = vec3(0.10, 0.48, 0.97);
+  const vec3 baseColor2 = vec3(0.45, 0.77, 1.00);
+  const vec3 baseColor3 = vec3(0.34, 0.62, 0.99);
+  const float innerRadius = 0.6;
+  const float noiseScale = 0.65;
 
-    // gentle voice swell + wobble
-    p *= (1.0 - uVoice * 0.08);
-    p += uVoice * 0.035 * vec2(sin(iTime*3.0 + p.y*6.0), cos(iTime*2.6 + p.x*6.0));
+  float light1(float i,float a,float d){ return i/(1.0+d*a); }
+  float light2(float i,float a,float d){ return i/(1.0+d*d*a); }
 
-    float radius = 0.92;
-    float r = length(p);
-    float alpha = smoothstep(radius, radius - 0.05, r);   // crisp-soft circular edge, contained
-    if (alpha <= 0.001) { gl_FragColor = vec4(0.0); return; }
+  vec4 draw(vec2 uv){
+    vec3 color1=adjustHue(baseColor1,hue);
+    vec3 color2=adjustHue(baseColor2,hue);
+    vec3 color3=adjustHue(baseColor3,hue);
+    float ang=atan(uv.y,uv.x);
+    float len=length(uv);
+    float invLen=len>0.0?1.0/len:0.0;
+    float n0=snoise3(vec3(uv*noiseScale,iTime*0.5))*0.5+0.5;
+    float r0=mix(mix(innerRadius,1.0,0.4),mix(innerRadius,1.0,0.6),n0);
+    float d0=distance(uv,(r0*invLen)*uv);
+    float v0=light1(1.0,10.0,d0); v0*=smoothstep(r0*1.05,r0,len);
+    float cl=cos(ang+iTime*2.0)*0.5+0.5;
+    float a=iTime*-1.0;
+    vec2 pos=vec2(cos(a),sin(a))*r0;
+    float v1=light2(1.5,5.0,distance(uv,pos)); v1*=light1(1.0,50.0,d0);
+    float v2=smoothstep(1.0,mix(innerRadius,1.0,n0*0.5),len);
+    float v3=smoothstep(innerRadius,mix(innerRadius,1.0,0.5),len);
 
-    // fake sphere normal -> 3D volume
-    float z = sqrt(max(0.0, radius*radius - r*r)) / radius;
-    vec3 N = normalize(vec3(p / radius, z));
-    vec3 L = normalize(vec3(-0.35, 0.55, 0.85));
-    float diff = clamp(dot(N, L), 0.0, 1.0);
-
-    // flowing surface for life
-    float t = iTime * (0.22 + uVoice * 0.35);
-    float fl  = snoise3(vec3(p * 2.1, t)) * 0.5 + 0.5;
-    float fl2 = snoise3(vec3(p * 4.4 - 3.0, t * 0.8)) * 0.5 + 0.5;
-
-    // Paytm palette: deep navy-blue in shadow -> blue -> bright sky in light
-    vec3 deep = vec3(0.02, 0.22, 0.62);
-    vec3 blue = vec3(0.05, 0.49, 0.95);
-    vec3 sky  = vec3(0.60, 0.83, 1.00);
-    vec3 col = mix(deep, blue, diff);
-    col = mix(col, sky, smoothstep(0.5, 1.0, diff) * (0.5 + 0.3 * fl));
-    col = mix(col, blue, fl2 * 0.22);                       // subtle flowing variation
-
-    // cool glassy rim (fresnel)
-    float fres = pow(1.0 - z, 2.4);
-    col += sky * fres * (0.30 + 0.35 * uVoice);
-
-    // specular highlight (glossy)
-    vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
-    float spec = pow(clamp(dot(N, H), 0.0, 1.0), 30.0);
-    col += vec3(1.0) * spec * 0.55;
-
-    col += blue * uVoice * 0.22;                            // voice brightens
-    col = clamp(col, 0.0, 1.0);
-    gl_FragColor = vec4(col * alpha, alpha);                // premultiplied
+    vec3 col=mix(color1,color2,cl);
+    col=mix(color3,col,v0);
+    col=col+v1;                          // keep the glow highlight (original)
+    col=clamp(col,0.0,1.0);
+    float mask=clamp(v2*v3,0.0,1.0);     // original edge -> used as ALPHA (not multiplied into color)
+    return vec4(col,mask);
+  }
+  vec4 mainImage(vec2 fragCoord){
+    vec2 center=iResolution.xy*0.5;
+    float size=min(iResolution.x,iResolution.y);
+    vec2 uv=(fragCoord-center)/size*2.0;
+    float s=sin(rot),c=cos(rot);
+    uv=vec2(c*uv.x-s*uv.y,s*uv.x+c*uv.y);
+    uv.x+=hover*hoverIntensity*0.1*sin(uv.y*10.0+iTime);
+    uv.y+=hover*hoverIntensity*0.1*sin(uv.x*10.0+iTime);
+    return draw(uv);
+  }
+  void main(){
+    vec4 col=mainImage(vUv*iResolution.xy);
+    gl_FragColor=vec4(col.rgb,col.a);   // NON-premultiplied (matches blendFunc) -> no dark edge fringe
   }
 `;
 
-export default function Orb({ className, listening = false, onLevel }) {
+export default function Orb({ className, listening = false, onLevel, hue = 0 }) {
   const ctn = useRef(null);
   const listeningRef = useRef(listening);
   listeningRef.current = listening;
   const onLevelRef = useRef(onLevel);
   onLevelRef.current = onLevel;
+  const hueRef = useRef(hue);
+  hueRef.current = hue;
 
   useEffect(() => {
     const container = ctn.current;
@@ -116,7 +127,7 @@ export default function Orb({ className, listening = false, onLevel }) {
       analyser.getByteFrequencyData(dataArr);
       let sum = 0;
       for (let i = 0; i < dataArr.length; i++) { const v = dataArr[i] / 255; sum += v * v; }
-      return Math.min(Math.sqrt(sum / dataArr.length) * 6.0, 1);
+      return Math.min(Math.sqrt(sum / dataArr.length) * 4.5, 1);
     };
 
     try {
@@ -130,7 +141,10 @@ export default function Orb({ className, listening = false, onLevel }) {
 
       program = new Program(gl, {
         vertex: VERT, fragment: FRAG,
-        uniforms: { iTime: { value: 0 }, iResolution: { value: new Vec3(1, 1, 1) }, uVoice: { value: 0 } },
+        uniforms: {
+          iTime: { value: 0 }, iResolution: { value: new Vec3(1, 1, 1) },
+          hue: { value: hue }, hover: { value: 0 }, rot: { value: 0 }, hoverIntensity: { value: 0 },
+        },
       });
       const mesh = new Mesh(gl, { geometry: new Triangle(gl), program });
 
@@ -142,17 +156,22 @@ export default function Orb({ className, listening = false, onLevel }) {
       };
       window.addEventListener('resize', resize); resize();
 
-      let last = 0, lvl = 0;
+      let last = 0, curRot = 0, lvl = 0;
+      const baseSpin = 0.3;
       const tick = (t) => {
         raf = requestAnimationFrame(tick);
-        last = t;
+        const dt = (t - last) * 0.001; last = t;
         program.uniforms.iTime.value = t * 0.001;
+        program.uniforms.hue.value = hueRef.current;
         if (listeningRef.current && !micOn) startMic();
         if (!listeningRef.current && micOn) stopMic();
         const target = (listeningRef.current && micOn) ? level() : 0;
-        lvl = lvl * 0.8 + target * 0.2;
+        lvl = lvl * 0.75 + target * 0.25;
         onLevelRef.current?.(lvl);
-        program.uniforms.uVoice.value = lvl;
+        curRot += dt * (baseSpin + lvl * 2.4);
+        program.uniforms.rot.value = curRot;
+        program.uniforms.hover.value = Math.min(lvl * 2.0, 1.0);
+        program.uniforms.hoverIntensity.value = Math.min(lvl * 0.8, 0.8);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         renderer.render({ scene: mesh });
       };

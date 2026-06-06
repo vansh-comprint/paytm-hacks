@@ -37,7 +37,7 @@ export default function Ledger({ sales }) {
                 >
                   <span
                     className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
-                      cash ? 'bg-[oklch(0.95_0.04_80)] text-cash-ink' : 'bg-[oklch(0.95_0.03_235)] text-upi'
+                      cash ? 'bg-cash/15 text-cash' : 'bg-upi/15 text-upi'
                     }`}
                   >
                     {cash ? <Coins size={16} /> : <Smartphone size={16} />}

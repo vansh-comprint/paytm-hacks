@@ -31,7 +31,7 @@ export default function WhatsAppSent({ messages }) {
               </span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                  m.mock ? 'bg-[oklch(0.95_0.04_80)] text-cash-ink' : 'bg-wa/12 text-wa'
+                  m.mock ? 'bg-cash/15 text-cash' : 'bg-wa/15 text-wa'
                 }`}
               >
                 {m.mock ? 'Mock' : 'Sent'}

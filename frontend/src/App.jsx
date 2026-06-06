@@ -132,7 +132,7 @@ export default function App() {
         <div className="mt-2 grid gap-5">
           <section className="relative flex flex-col items-center pt-1">
             <Orb
-              className="pointer-events-none h-[min(64vw,380px)] w-[min(64vw,380px)]"
+              className="pointer-events-none -my-6 h-[min(90vw,600px)] w-[min(90vw,600px)]"
               listening={recording || wakeEnabled}
             />
             <p className="deva -mt-3 text-[15px] text-muted">
@@ -153,7 +153,7 @@ export default function App() {
           {reply && (
             <div
               key={reply.reply_text}
-              className="animate-fade-up rounded-[var(--radius)] border border-line bg-[oklch(0.97_0.018_235)] px-4 py-3"
+              className="animate-fade-up rounded-[var(--radius)] border border-line bg-panel-2 px-4 py-3"
             >
               {reply.transcript && <p className="text-[12.5px] italic text-muted">“{reply.transcript}”</p>}
               <p className="mt-0.5 deva text-[15px] font-medium leading-relaxed text-ink">{reply.reply_text}</p>

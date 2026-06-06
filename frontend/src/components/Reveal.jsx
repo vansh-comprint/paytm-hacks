@@ -28,7 +28,7 @@ export default function Reveal({ eod, onSpeak, speaking }) {
 
   return (
     <section
-      className="animate-fade-up relative overflow-hidden rounded-[var(--radius)] border border-line bg-panel p-6 sm:p-7 shadow-[0_1px_0_oklch(1_0_0/0.7)_inset,0_24px_60px_-40px_oklch(0.3_0.1_250/0.55)]"
+      className="animate-fade-up relative overflow-hidden rounded-[var(--radius)] border border-line bg-panel p-6 sm:p-7 shadow-[0_1px_0_oklch(1_0_0/0.05)_inset,0_24px_60px_-40px_oklch(0_0_0/0.6)]"
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
@@ -66,7 +66,7 @@ export default function Reveal({ eod, onSpeak, speaking }) {
       </div>
 
       {/* tactile till bar: cash is "found" second */}
-      <div className="mt-5 flex h-3.5 w-full overflow-hidden rounded-full bg-[oklch(0.93_0.01_245)]">
+      <div className="mt-5 flex h-3.5 w-full overflow-hidden rounded-full bg-[oklch(0.30_0.03_258)]">
         <span className="grow-x block h-full bg-upi" style={{ width: `${upiPct}%`, animationDelay: '0.12s' }} />
         <span className="grow-x block h-full bg-cash" style={{ width: `${cashPct}%`, animationDelay: '0.55s' }} />
       </div>
@@ -86,7 +86,7 @@ export default function Reveal({ eod, onSpeak, speaking }) {
         </p>
       )}
       {eod.misses?.length > 0 && (
-        <p className="mt-3 rounded-xl border border-[oklch(0.85_0.07_75)] bg-[oklch(0.96_0.04_80)] px-3.5 py-2.5 text-[13px] text-cash-ink">
+        <p className="mt-3 rounded-xl border border-cash/30 bg-cash/12 px-3.5 py-2.5 text-[13px] text-cash">
           {eod.misses.length} asked for <b>{eod.misses.join(', ')}</b> you didn’t have.
         </p>
       )}
