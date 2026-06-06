@@ -41,6 +41,7 @@ export function computeEod() {
   const upiFromSales = sum(store.sales.filter((s) => s.type === 'upi'));
   const upiSeed = sum(store.upiTxns);
   const upi = upiFromSales + upiSeed;
+  const expenses = sum(store.expenses);
   const start = busiestWindow();
   const misses = store.todos
     .filter((t) => t.kind === 'restock' && t.status === 'open')
@@ -49,10 +50,13 @@ export function computeEod() {
     total: cash + upi,
     cash,
     upi,
+    expenses,
+    net_cash: cash - expenses,        // cash actually in the drawer
     sale_count: store.sales.length + store.upiTxns.length,
     busiest_hours: start == null ? null : `${pad(start)}:00–${pad(start + 2)}:00`,
     top_items: topItems(),
     misses,
+    to_review: store.reviews.filter((r) => r.status === 'open').length,
   };
 }
 
@@ -70,6 +74,7 @@ export function speakEod() {
   let line = `आज ${e.total} रुपये की बिक्री हुई — ${e.upi} रुपये ऑनलाइन और ${e.cash} रुपये कैश। कुल ${e.sale_count} सेल।`;
   const busy = hindiPeriodLabel(busiestWindow());
   if (busy) line += ` सबसे ज़्यादा भीड़ ${busy}।`;
+  if (e.expenses) line += ` ${e.expenses} रुपये का खर्चा निकला, तो ${e.net_cash} रुपये कैश हाथ में।`;
   if (e.misses.length) line += ` ${e.misses.length} बार ${e.misses[0]} माँगी गई जो स्टॉक में नहीं थी।`;
   return line;
 }

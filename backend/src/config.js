@@ -26,6 +26,11 @@ export const config = {
     name: process.env.MERCHANT_NAME || 'Sharma General Store',
     vpa: process.env.MERCHANT_VPA || 'sharmastore@paytm',
   },
+
+  // Demo override: when set, ALL seed contacts + suppliers use this phone, so every WhatsApp
+  // and reminder lands on one watchable phone. Kept in .env (gitignored) so no real number
+  // is committed to the public repo.
+  demoPhone: process.env.DEMO_PHONE || '',
 };
 
 export function requireKey() {

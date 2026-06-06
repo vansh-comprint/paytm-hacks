@@ -4,9 +4,13 @@ import { chat } from './sarvam.js';
 import { store } from './store.js';
 import { hindiToNumber } from './hindi.js';
 
-const TYPES = ['log_sale', 'log_udhaar', 'log_miss', 'query', 'mark_done', 'unknown'];
+const TYPES = ['log_sale', 'log_udhaar', 'log_miss', 'set_reminder', 'query', 'mark_done', 'unknown'];
 const QKINDS = ['today_total', 'what_owed', 'cash_vs_upi', null];
-const empty = () => ({ type: 'unknown', amount: null, pay_type: null, item: null, customer: null, query_kind: null });
+const DIRS = ['in', 'out', 'unclear', null];
+const empty = () => ({
+  type: 'unknown', amount: null, pay_type: null, item: null,
+  customer: null, query_kind: null, direction: null, when: null,
+});
 
 export function systemPrompt() {
   const names = store.contacts.map((c) => c.name).join(', ') || '(none)';
@@ -16,17 +20,28 @@ The shopkeeper speaks Hindi / Hinglish (already transcribed to English). Read ON
 and output ONLY a single JSON object — no prose, no markdown fences.
 
 Schema (every key ALWAYS present; null when N/A):
-{ "type":"log_sale"|"log_udhaar"|"log_miss"|"query"|"mark_done"|"unknown",
+{ "type":"log_sale"|"log_udhaar"|"log_miss"|"set_reminder"|"query"|"mark_done"|"unknown",
   "amount":<number|null>, "pay_type":"cash"|"upi"|null, "item":<string|null>,
-  "customer":<string|null>, "query_kind":"today_total"|"what_owed"|"cash_vs_upi"|null }
+  "customer":<string|null>, "query_kind":"today_total"|"what_owed"|"cash_vs_upi"|null,
+  "direction":"in"|"out"|"unclear"|null, "when":<string|null> }
 
 Types:
-- log_sale  : a completed PAID sale. set amount, pay_type (cash, or upi for "online/UPI/Paytm/GPay"), item.
+- log_sale  : money RECEIVED for a sale. set amount, pay_type (cash, or upi for "online/UPI/Paytm/GPay"), item, direction "in".
 - log_udhaar: credit / someone owes (udhaar, baaki, "likh do"). set amount, customer, item. pay_type null.
-- log_miss  : a wanted item was out of stock / reorder needed ("khatam thi", "order kar do"). set item; amount=quantity if said.
-- query     : a question. query_kind="today_total" (kitna becha/kamaaya), "cash_vs_upi" (cash vs online split / "aaj ka hisaab"), "what_owed" (kiska udhaar baaki).
+- log_miss  : a wanted item is out of stock / reorder needed ("khatam ho gayi", "order kar do"). set item; amount=quantity if said.
+- set_reminder: owner wants to be reminded / remind a debtor at a TIME ("Ramesh ko 6 baje yaad dilana", "do minute baad reminder", "kal yaad dilana"). set customer, when (and amount/item if a new udhaar is also stated).
+- query     : a question. query_kind="today_total" (kitna becha/kamaaya), "cash_vs_upi" ("aaj ka hisaab"), "what_owed" (kiska udhaar baaki).
 - mark_done : completing a to-do. identify via item or customer.
 - unknown   : anything else.
+
+direction (for cash only): "in" = money received (a sale). "out" = money PAID OUT / expense
+("X ko diya", "kharcha", "bill bhara"). "unclear" = a cash amount is mentioned but it is
+NOT clear whether it came in or went out (e.g. bare "pachaas rupaye diye" with no payer) —
+prefer "unclear" over guessing; the backend will queue it for the owner to review.
+
+when: if a time is mentioned, normalize it to EXACTLY one of these shapes (else null):
+"in N minutes" | "in N hours" | "in N days" | "today HH:MM" | "tomorrow HH:MM" (24-hour).
+e.g. "6 baje"->"today 18:00", "do minute baad"->"in 2 minutes", "teen din baad"->"in 3 days", "kal subah 9 baje"->"tomorrow 09:00".
 
 Rules:
 - Output JSON ONLY.
@@ -39,13 +54,16 @@ KNOWN CUSTOMERS: ${names}
 KNOWN ITEMS: ${items}
 
 Examples:
-"Paytm, pachaas cash Maggi" -> {"type":"log_sale","amount":50,"pay_type":"cash","item":"Maggi","customer":null,"query_kind":null}
-"sau rupaye online doodh" -> {"type":"log_sale","amount":100,"pay_type":"upi","item":"Milk","customer":null,"query_kind":null}
-"Ramesh ko paanch sau ka udhaar likh do" -> {"type":"log_udhaar","amount":500,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null}
-"do logon ne Maggi maangi khatam thi" -> {"type":"log_miss","amount":2,"pay_type":null,"item":"Maggi","customer":null,"query_kind":null}
-"aaj kitna becha" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"today_total"}
-"aaj ka hisaab" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"cash_vs_upi"}
-"kiska udhaar baaki hai" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"what_owed"}`;
+"Paytm, pachaas cash Maggi" -> {"type":"log_sale","amount":50,"pay_type":"cash","item":"Maggi","customer":null,"query_kind":null,"direction":"in","when":null}
+"sau rupaye online doodh" -> {"type":"log_sale","amount":100,"pay_type":"upi","item":"Milk","customer":null,"query_kind":null,"direction":"in","when":null}
+"cheeni khatam ho gayi hai" -> {"type":"log_miss","amount":null,"pay_type":null,"item":"Sugar","customer":null,"query_kind":null,"direction":null,"when":null}
+"pachaas rupaye diye" -> {"type":"log_sale","amount":50,"pay_type":"cash","item":null,"customer":null,"query_kind":null,"direction":"unclear","when":null}
+"chai wale ko bees rupaye diye" -> {"type":"log_sale","amount":20,"pay_type":"cash","item":null,"customer":null,"query_kind":null,"direction":"out","when":null}
+"Ramesh ko paanch sau ka udhaar likh do" -> {"type":"log_udhaar","amount":500,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null,"direction":null,"when":null}
+"Ramesh ko do minute baad yaad dilana" -> {"type":"set_reminder","amount":null,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null,"direction":null,"when":"in 2 minutes"}
+"Suresh ko 6 baje paise ka reminder bhejna" -> {"type":"set_reminder","amount":null,"pay_type":null,"item":null,"customer":"Suresh Patel","query_kind":null,"direction":null,"when":"today 18:00"}
+"aaj ka hisaab" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"cash_vs_upi","direction":null,"when":null}
+"kiska udhaar baaki hai" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"what_owed","direction":null,"when":null}`;
 }
 
 function extractJson(text) {
@@ -61,6 +79,9 @@ function normalize(raw, transcript) {
   if (!TYPES.includes(out.type)) out.type = 'unknown';
   if (!['cash', 'upi', null].includes(out.pay_type)) out.pay_type = null;
   if (!QKINDS.includes(out.query_kind)) out.query_kind = null;
+  if (!DIRS.includes(out.direction)) out.direction = null;
+  if (out.when != null && typeof out.when !== 'string') out.when = String(out.when);
+  if (typeof out.when === 'string' && !out.when.trim()) out.when = null;
 
   if (typeof out.amount === 'string') {
     const m = out.amount.match(/-?\d+(?:\.\d+)?/);

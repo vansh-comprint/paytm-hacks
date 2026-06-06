@@ -5,43 +5,60 @@
 <title>Galla · Dev B test harness</title>
 <style>
   :root { color-scheme: light dark; }
-  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 22px; max-width: 980px; }
-  h1 { font-size: 17px; margin: 0 0 2px; } .sub { color:#888; font-size:13px; margin:0 0 16px; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-  input[type=text]{ flex:1; min-width:280px; padding:9px 11px; border:1px solid #bbb; border-radius:8px; font-size:15px; }
-  button{ padding:9px 14px; border:0; border-radius:8px; background:#0b5; color:#fff; font-weight:600; cursor:pointer; }
-  button.ghost{ background:#e5e7eb; color:#111; } button.rec{ background:#dc2626; }
-  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:760px){ .cols{ grid-template-columns:1fr; } }
-  pre{ background:#0b1020; color:#c8d3f5; padding:11px; border-radius:8px; overflow:auto; max-height:340px; font-size:12.5px; }
-  .card{ border:1px solid #ddd; border-radius:10px; padding:10px; margin:7px 0; } .pill{ background:#eef; border-radius:99px; padding:2px 9px; font-size:12px; margin-right:6px; }
-  .chips button{ background:#eef; color:#114; font-weight:500; margin:0 6px 6px 0; font-size:13px; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; max-width: 1040px; }
+  h1 { font-size: 17px; margin: 0 0 2px; } .sub { color:#888; font-size:13px; margin:0 0 14px; }
+  h3 { margin: 16px 0 6px; font-size: 14px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  input[type=text]{ flex:1; min-width:240px; padding:9px 11px; border:1px solid #bbb; border-radius:8px; font-size:15px; }
+  select { padding:9px; border-radius:8px; border:1px solid #bbb; }
+  button{ padding:8px 12px; border:0; border-radius:8px; background:#0b5; color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost{ background:#e5e7eb; color:#111; } button.rec{ background:#dc2626; } button.warn{ background:#b45309; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:820px){ .cols{ grid-template-columns:1fr; } }
+  pre{ background:#0b1020; color:#c8d3f5; padding:10px; border-radius:8px; overflow:auto; max-height:300px; font-size:12px; }
+  .card{ border:1px solid #ddd; border-radius:10px; padding:9px; margin:6px 0; }
+  .pill{ background:#eef; border-radius:99px; padding:2px 9px; font-size:12px; margin-right:5px; }
+  .chips button{ background:#eef; color:#114; font-weight:500; margin:0 5px 5px 0; font-size:12.5px; }
 </style></head>
 <body>
   <h1>🧮 Galla — Dev B test harness</h1>
-  <p class="sub">Backend-only tester (Octo owns the real UI). Exercises <code>/turn</code> · <code>/state</code> · <code>/collect/confirm</code>.</p>
+  <p class="sub">Backend tester (Octo owns the real UI). Mode = active-listening / conversational / off.</p>
 
   <div class="row">
-    <input id="text" type="text" placeholder='e.g. "Paytm, pachaas cash Maggi"  /  "aaj ka hisaab"' onkeydown="if(event.key==='Enter')sendText()" />
+    <select id="mode">
+      <option value="text">text (conversational)</option>
+      <option value="wake">wake (conversational 🔊)</option>
+      <option value="ambient">ambient (active listening, log-only)</option>
+    </select>
+    <input id="text" type="text" placeholder='e.g. "Paytm sau cash maggi" / "aaj ka hisaab" / "cheeni khatam"' onkeydown="if(event.key==='Enter')sendText()" />
     <button onclick="sendText()">Send</button>
     <button id="mic" class="rec" onclick="toggleMic()">● Rec</button>
-    <button class="ghost" onclick="refresh()">↻ State</button>
+    <button class="ghost" onclick="refresh()">↻</button>
     <button class="ghost" onclick="reset()">Reset</button>
   </div>
   <div class="chips">
-    <button onclick="quick('Paytm, pachaas cash Maggi')">pachaas cash Maggi</button>
-    <button onclick="quick('sau rupaye online doodh')">sau online doodh</button>
-    <button onclick="quick('do logon ne Maggi maangi khatam thi')">Maggi khatam</button>
-    <button onclick="quick('Ramesh ko paanch sau ka udhaar likh do')">Ramesh udhaar</button>
-    <button onclick="quick('aaj ka hisaab')">aaj ka hisaab 🔊</button>
-    <button onclick="quick('kiska udhaar baaki hai')">kiska udhaar 🔊</button>
+    <button onclick="quick('Paytm sau cash maggi')">sau cash maggi</button>
+    <button onclick="quick('do sau online doodh')">online doodh</button>
+    <button onclick="quick('cheeni khatam ho gayi hai','ambient')">🛒 cheeni khatam</button>
+    <button onclick="quick('pachaas rupaye diye','ambient')">❓ pachaas diye</button>
+    <button onclick="quick('chai wale ko bees rupaye diye','ambient')">💸 expense</button>
+    <button onclick="quick('Ramesh ko ek minute baad reminder bhejna','wake')">⏰ remind Ramesh 1min</button>
+    <button onclick="quick('aaj ka hisaab','wake')">🔊 aaj ka hisaab</button>
+    <button onclick="quick('kiska udhaar baaki hai','wake')">🔊 kiska udhaar</button>
   </div>
-  <audio id="player" controls style="width:100%;margin:10px 0"></audio>
+  <audio id="player" controls style="width:100%;margin:8px 0"></audio>
 
   <div class="cols">
-    <div><h3>Last turn</h3><pre id="turn">—</pre>
-      <h3>Collections (open udhaar)</h3><div id="udhaar"></div></div>
-    <div><h3>EOD (hero)</h3><pre id="eod">—</pre>
-      <h3>State</h3><pre id="state">—</pre></div>
+    <div>
+      <h3>Last turn</h3><pre id="turn">—</pre>
+      <h3>🛒 Pending orders (tap = WhatsApp + call)</h3><div id="orders"></div>
+      <h3>❓ Review queue (ambiguous cash)</h3><div id="reviews"></div>
+      <h3>💰 Collections (open udhaar)</h3><div id="udhaar"></div>
+    </div>
+    <div>
+      <h3>EOD (hero)</h3><pre id="eod">—</pre>
+      <h3>📞 Calls + ⏰ Scheduled</h3><div id="calls"></div>
+      <h3>State</h3><pre id="state">—</pre>
+    </div>
   </div>
 
 <script>
@@ -53,32 +70,50 @@ async function turn(body){
   if(j.reply_audio_url){ const p=document.getElementById("player"); p.src=j.reply_audio_url; p.play().catch(()=>{}); }
   refresh();
 }
-function quick(t){ turn({mode:"text",text:t}); }
-function sendText(){ const t=document.getElementById("text").value.trim(); if(!t)return; turn({mode:"text",text:t}); document.getElementById("text").value=""; }
+function quick(t,m){ if(m) document.getElementById("mode").value=m; turn({mode:document.getElementById("mode").value,text:t}); }
+function sendText(){ const t=document.getElementById("text").value.trim(); if(!t)return; turn({mode:document.getElementById("mode").value,text:t}); document.getElementById("text").value=""; }
+
 async function refresh(){
   const j = await (await fetch(API+"/state")).json();
   document.getElementById("eod").textContent = JSON.stringify(j.eod,null,2);
-  document.getElementById("state").textContent = JSON.stringify({sales:j.sales,todos:j.todos,messages:j.messages},null,2);
-  const box=document.getElementById("udhaar"); box.innerHTML="";
-  (j.todos||[]).filter(t=>t.kind==="collect"&&t.status==="open").forEach(t=>{
-    const d=document.createElement("div"); d.className="card";
-    d.innerHTML=`<span class="pill">₹${t.amount}</span><b>${t.customer}</b> ${t.item?("— "+t.item):""} ${t.reminded?'<span class="pill">reminded</span>':''}
-      <br><button onclick="collect('${t.id}')" style="margin-top:7px">Send reminder</button>`;
-    box.appendChild(d);
-  });
+  document.getElementById("state").textContent = JSON.stringify({sales:j.sales,expenses:j.expenses,messages:j.messages.length},null,2);
+
+  fill("orders", (j.todos||[]).filter(t=>t.kind==="restock"&&t.status==="open"), t=>
+    `<span class="pill">restock</span><b>${t.item}</b> ${t.qty?("× "+t.qty):""}<br>
+     <button onclick="procure('${t.id}')" style="margin-top:6px">Confirm order → supplier</button>`);
+
+  fill("reviews", (j.reviews||[]).filter(r=>r.status==="open"), r=>
+    `<span class="pill">₹${r.amount}</span>${r.reason}<br>
+     <button onclick="resolve('${r.id}','in')" style="margin-top:6px">Money in (sale)</button>
+     <button class="warn" onclick="resolve('${r.id}','out')">Out (expense)</button>
+     <button class="ghost" onclick="resolve('${r.id}','ignore')">Ignore</button>`);
+
+  fill("udhaar", (j.todos||[]).filter(t=>t.kind==="collect"&&t.status==="open"), t=>
+    `<span class="pill">₹${t.amount}</span><b>${t.customer}</b> ${t.item?("— "+t.item):""} ${t.reminded?'<span class="pill">reminded</span>':''}<br>
+     <button onclick="collect('${t.id}')" style="margin-top:6px">Send reminder</button>`);
+
+  const calls = (j.calls||[]).slice().reverse().map(c=>
+    `<div class="card"><span class="pill">${c.kind}</span><b>${c.name}</b>
+     ${c.audio_url?`<br><audio src="${API+c.audio_url}" controls style="width:100%;margin-top:5px"></audio>`:""}
+     <div style="color:#888;font-size:12px">${c.script}</div></div>`).join("");
+  const sched = (j.scheduled||[]).map(s=>`<div class="card"><span class="pill">${s.status}</span>⏰ ${s.customer} ₹${s.amount} @ ${new Date(s.fireAt).toLocaleTimeString()}</div>`).join("");
+  document.getElementById("calls").innerHTML = sched + calls || "—";
 }
-async function collect(id){
-  const j = await (await fetch(API+"/collect/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({udhaar_id:id})})).json();
-  alert((j.message?.mock===false?"✅ Sent on WhatsApp!\n\n":"📋 Mock card (WHATSAPP_MODE=mock):\n\n")+(j.message?.body||JSON.stringify(j))); refresh();
-}
+function fill(id, arr, tmpl){ const box=document.getElementById(id); box.innerHTML=""; arr.forEach(x=>{ const d=document.createElement("div"); d.className="card"; d.innerHTML=tmpl(x); box.appendChild(d); }); if(!arr.length) box.innerHTML='<span style="color:#999">—</span>'; }
+
+async function procure(id){ const j=await post("/procure/confirm",{todo_id:id}); alert((j.message?.mock===false?"✅ Order sent on WhatsApp!\n\n":"📋 Mock order:\n\n")+(j.message?.body||"")+"\n\n📞 Call: "+(j.call?.script||"")); refresh(); }
+async function resolve(id,res){ await post("/review/resolve",{review_id:id,resolution:res}); refresh(); }
+async function collect(id){ const j=await post("/collect/confirm",{udhaar_id:id}); alert((j.message?.mock===false?"✅ Sent on WhatsApp!\n\n":"📋 Mock card:\n\n")+(j.message?.body||"")); refresh(); }
 async function reset(){ await fetch(API+"/reset",{method:"POST"}); refresh(); }
+const post = async (path,body)=> (await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+
 let rec,chunks=[],on=false;
 async function toggleMic(){
   const b=document.getElementById("mic");
   if(!on){ const s=await navigator.mediaDevices.getUserMedia({audio:true}); rec=new MediaRecorder(s); chunks=[];
     rec.ondataavailable=e=>chunks.push(e.data);
     rec.onstop=async()=>{ const blob=new Blob(chunks,{type:"audio/webm"}); const b64=await blobToB64(blob);
-      turn({mode:"wake",audioBase64:b64}); s.getTracks().forEach(t=>t.stop()); };
+      turn({mode:document.getElementById("mode").value,audioBase64:b64}); s.getTracks().forEach(t=>t.stop()); };
     rec.start(); on=true; b.textContent="■ Stop";
   } else { rec.stop(); on=false; b.textContent="● Rec"; }
 }

@@ -64,3 +64,40 @@ type Eod     = { total: number; cash: number; upi: number; sale_count: number;
 - **Reply language is Hindi** (Devanagari for spoken EOD/query).
 - Sarvam models in use (verified live): STT `saaras:v2.5`, LLM `sarvam-30b`, TTS `bulbul:v3`/`priya`.
   (AGENTS.md's `sarvam-m` is deprecated.)
+
+---
+
+## Agent extensions (ADDITIVE — backwards compatible, but Octo should know)
+
+**The 3 modes** (all via `/turn`'s `mode`):
+- `ambient` = active listening — logs only, never returns audio. Captures sales/cash + needs
+  like *"cheeni khatam"*. Ambiguous cash → review queue.
+- `wake` / `text` = conversational — talks back; owner orders stock, sets reminders.
+- off = the frontend simply stops sending.
+
+**Intent gained two fields:**
+- `direction: "in" | "out" | "unclear" | null` — for cash: received / paid-out / ambiguous.
+  `unclear` (e.g. ambient "pachaas rupaye diye") creates a **Review** the owner resolves.
+- `when: string | null` — for `set_reminder` (a new intent type). Normalized to
+  `"in N minutes" | "in N hours" | "in N days" | "today HH:MM" | "tomorrow HH:MM"`.
+
+**New intent type `set_reminder`** — "Ramesh ko 6 baje yaad dilana" → schedules a reminder
+that auto-fires WhatsApp **+ a simulated call** at the time.
+
+**New endpoints:**
+```
+POST /procure/confirm  { todo_id }          // approve a pending `restock` todo
+   -> { message, call, todo }               // orders the supplier: WhatsApp + simulated call
+
+POST /review/resolve   { review_id, resolution: "in"|"out"|"ignore" }
+   -> { review, eod }                        // resolve an ambiguous-cash entry
+```
+
+**`/state` gained additive arrays:** `expenses[]`, `reviews[]`, `scheduled[]`, `calls[]`,
+`suppliers[]`, `contacts[]`, `items[]`, `upi_txns[]`. (The original four — `sales/todos/messages/eod` — are unchanged.)
+
+**`Eod` gained:** `expenses`, `net_cash` (cash − expenses), `to_review`.
+
+**Calls are SIMULATED** (no telephony): `Call.audio_url` is a Hindi Bulbul "recording" the
+frontend plays as a 📞 call. See `/contract/types.ts` for the new interfaces
+(`Review`, `Scheduled`, `Call`, `Expense`, `Supplier`).

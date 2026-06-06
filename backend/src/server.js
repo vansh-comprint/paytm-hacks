@@ -1,25 +1,27 @@
-// Galla backend — the contract surface (AGENTS.md §3). Express on :8000, CORS open to :5173.
+// Galla backend — the contract surface (AGENTS.md §3) + agent actions.
+// Express on :8000, CORS open to :5173.
 import express from 'express';
 import cors from 'cors';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { config, requireKey } from './config.js';
-import { store, loadSeed, nextId } from './store.js';
+import { store, loadSeed, nextId, theSupplier, findTodo, findReview, nowIso } from './store.js';
 import { route, emptyIntent } from './router.js';
 import { applyIntent } from './ledger.js';
 import { computeEod } from './eod.js';
-import { sendCollection } from './whatsapp.js';
+import { sendCollection, sendOrder } from './whatsapp.js';
+import { simulateCall } from './calls.js';
+import { startScheduler } from './scheduler.js';
+import { AUDIO_DIR, saveWav } from './audio.js';
 import * as sarvam from './sarvam.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AUDIO_DIR = path.resolve(__dirname, '../audio');
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
-fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
 requireKey();
 loadSeed();
+startScheduler();
 
 const app = express();
 app.use(cors());
@@ -42,17 +44,13 @@ app.post('/turn', async (req, res) => {
     }
 
     const intent = await route(transcript);
-    const result = await applyIntent(intent);
+    const result = await applyIntent(intent, { mode });
 
     let reply_audio_url = null;
     if (result.speak && mode !== 'ambient' && result.reply_text) {
       try {
         const wav = await sarvam.tts(result.reply_text);
-        if (wav) {
-          const name = `${nextId('aud')}.wav`;
-          fs.writeFileSync(path.join(AUDIO_DIR, name), wav);
-          reply_audio_url = `${req.protocol}://${req.get('host')}/audio/${name}`;
-        }
+        if (wav) reply_audio_url = `${req.protocol}://${req.get('host')}${saveWav(wav)}`;
       } catch { /* never block the turn on TTS */ }
     }
 
@@ -62,12 +60,26 @@ app.post('/turn', async (req, res) => {
   }
 });
 
-// GET /state -> { sales, todos, messages, eod }
+// GET /state -> contract keys + additive agent state
 app.get('/state', (req, res) => {
-  res.json({ sales: store.sales, todos: store.todos, messages: store.messages, eod: computeEod() });
+  res.json({
+    sales: store.sales,
+    todos: store.todos,
+    messages: store.messages,
+    eod: computeEod(),
+    // additive (beyond §3): collections + procurement + agent actions
+    expenses: store.expenses,
+    reviews: store.reviews,
+    scheduled: store.scheduled,
+    calls: store.calls,
+    suppliers: store.suppliers,
+    contacts: store.contacts,
+    items: store.items,
+    upi_txns: store.upiTxns,
+  });
 });
 
-// POST /collect/confirm { udhaar_id } -> { message }   (udhaar_id = a `collect` todo id)
+// POST /collect/confirm { udhaar_id } -> { message }  (tap-to-send, WhatsApp only)
 app.post('/collect/confirm', async (req, res) => {
   const { udhaar_id } = req.body || {};
   const todo = store.todos.find((t) => t.id === udhaar_id && t.kind === 'collect');
@@ -77,10 +89,41 @@ app.post('/collect/confirm', async (req, res) => {
   res.json({ message });
 });
 
+// POST /procure/confirm { todo_id } -> { message, call }  (order the supplier: WhatsApp + simulated call)
+app.post('/procure/confirm', async (req, res) => {
+  const { todo_id } = req.body || {};
+  const todo = store.todos.find((t) => t.id === todo_id && t.kind === 'restock');
+  if (!todo) return res.status(404).json({ error: `restock item '${todo_id}' not found` });
+  const supplier = theSupplier();
+  if (!supplier) return res.status(400).json({ error: 'no supplier configured in seed' });
+
+  const itemsLine = todo.qty ? `${todo.qty} ${todo.item}` : todo.item || todo.text;
+  const message = await sendOrder(supplier, itemsLine);
+  const call = await simulateCall('order', { name: supplier.name, phone: supplier.phone, itemsLine });
+  todo.ordered = true;
+  todo.status = 'done';
+  res.json({ message, call, todo });
+});
+
+// POST /review/resolve { review_id, resolution:"in"|"out"|"ignore" } -> { review, eod }
+app.post('/review/resolve', (req, res) => {
+  const { review_id, resolution } = req.body || {};
+  const review = findReview(review_id);
+  if (!review) return res.status(404).json({ error: `review '${review_id}' not found` });
+  if (resolution === 'in') {
+    store.sales.push({ id: nextId('sale'), ts: nowIso(), type: 'cash', amount: review.amount, item: review.raw || 'cash sale', status: 'done' });
+  } else if (resolution === 'out') {
+    store.expenses.push({ id: nextId('exp'), ts: nowIso(), amount: review.amount, note: review.raw || 'cash diya' });
+  }
+  review.status = 'resolved';
+  review.resolution = resolution || 'ignore';
+  res.json({ review, eod: computeEod() });
+});
+
 // --- dev helpers ---
 app.get('/health', (req, res) => res.json({ ok: true, models: config.models, speaker: config.ttsSpeaker, whatsapp: config.whatsappMode }));
 app.post('/reset', (req, res) => { loadSeed(); res.json({ ok: true, eod: computeEod() }); });
 
 app.listen(config.port, () => {
-  console.log(`Galla backend on http://localhost:${config.port}  (models: ${JSON.stringify(config.models)})`);
+  console.log(`Galla backend on http://localhost:${config.port}  (models: ${JSON.stringify(config.models)}, whatsapp: ${config.whatsappMode})`);
 });

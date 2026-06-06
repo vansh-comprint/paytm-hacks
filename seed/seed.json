@@ -6,6 +6,9 @@
     { "id": "c4", "name": "Vijay Singh", "phone": "+919812345674" },
     { "id": "c5", "name": "Pooja Verma", "phone": "+919812345675" }
   ],
+  "suppliers": [
+    { "id": "s1", "name": "Verma Distributors", "phone": "+919800000001", "supplies": "general kirana — cheeni, doodh, atta, chawal, tea, oil" }
+  ],
   "items": [
     { "id": "i1", "name": "Milk", "unit": "litre", "price": 60 },
     { "id": "i2", "name": "Sugar", "unit": "kg", "price": 45 },

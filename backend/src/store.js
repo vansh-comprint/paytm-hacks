@@ -2,17 +2,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_PATH = path.resolve(__dirname, '../../seed/seed.json');
 
 export const store = {
-  sales: [],      // Sale  = { id, ts, type:"cash"|"upi", amount, item, customer_id?, status }
-  todos: [],      // Todo  = { id, ts, kind:"restock"|"collect"|"pay", text, status:"open"|"done", ...extra }
+  sales: [],      // Sale    = { id, ts, type:"cash"|"upi", amount, item, customer_id?, status }
+  expenses: [],   // Expense = { id, ts, amount, note }                 (cash OUT)
+  todos: [],      // Todo    = { id, ts, kind:"restock"|"collect"|"pay", text, status, ...extra }
+  reviews: [],    // Review  = { id, ts, raw, amount, reason, status:"open"|"resolved" }  (ambiguous cash)
+  scheduled: [],  // Sched   = { id, ts, fireAt, kind:"collect", customer, customer_id?, phone?, amount, status }
+  calls: [],      // Call    = { id, ts, kind:"order"|"collection", to, name, script, audio_url }
   messages: [],   // Message = { id, ts, to, channel:"whatsapp", body, link?, mock }
-  upiTxns: [],    // seeded mock UPI day (digital payments captured automatically)
+  upiTxns: [],    // seeded mock UPI day (auto-captured digital payments)
   contacts: [],
   items: [],
+  suppliers: [],
   _seq: 0,
 };
 
@@ -38,15 +44,28 @@ export function matchContact(name) {
 }
 
 export const findContact = (id) => store.contacts.find((c) => c.id === id) || null;
+export const theSupplier = () => store.suppliers[0] || null; // one supplier for the demo
+export const findTodo = (id) => store.todos.find((t) => t.id === id) || null;
+export const findReview = (id) => store.reviews.find((r) => r.id === id) || null;
 
 export function loadSeed() {
   const raw = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
   store.sales = [];
+  store.expenses = [];
   store.messages = [];
   store.todos = [];
+  store.reviews = [];
+  store.scheduled = [];
+  store.calls = [];
   store._seq = 0;
   store.contacts = raw.contacts || [];
   store.items = raw.items || [];
+  store.suppliers = raw.suppliers || [];
+  // Demo: route every contact + supplier to one watchable phone (kept out of the repo).
+  if (config.demoPhone) {
+    store.contacts = store.contacts.map((c) => ({ ...c, phone: config.demoPhone }));
+    store.suppliers = store.suppliers.map((s) => ({ ...s, phone: config.demoPhone }));
+  }
   store.upiTxns = (raw.upi_txns || []).map((t) => ({ ...t, ts: stampToday(t.ts) }));
 
   // Pre-seed a few open udhaar as `collect` todos so collections is demoable immediately.

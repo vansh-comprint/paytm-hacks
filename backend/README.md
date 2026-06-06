@@ -24,6 +24,18 @@ Open <http://localhost:8000/dev/dev.html> for a backend-only tester (type, mic, 
 ## EOD (the hero)
 `GET /state.eod` = voice-logged cash + seeded UPI day reconciled → `{ total, cash, upi, sale_count, busiest_hours, top_items, misses }`. The spoken Hindi tally is composed in `src/eod.js`.
 
+## 3 modes & agent actions
+- **ambient** (active listening) → log-only, no talk-back. Captures sales/cash + needs (*"cheeni khatam"*). Ambiguous cash (*"pachaas rupaye diye"*) → **review queue** (`/review/resolve`).
+- **wake / text** (conversational) → talks back; order stock, set reminders.
+- **off** → frontend stops sending.
+
+Actions:
+- **Procurement** — *"cheeni khatam"* → pending `restock` todo → tap `POST /procure/confirm {todo_id}` → WhatsApp order to the one supplier **+ a simulated Hindi call** (`Call.audio_url`).
+- **Reminders** — *"Ramesh ko 6 baje yaad dilana"* → `set_reminder` schedules a job; the in-process scheduler auto-fires WhatsApp **+ simulated call** at the time. Plus tap-to-send now (`/collect/confirm`).
+- **Calls are SIMULATED** (no telephony) — Bulbul Hindi "recordings" the UI plays. Real dialing is a fast-follow.
+
+> **Demo phone:** set `DEMO_PHONE=+91…` in `.env` and every contact + supplier routes to that one phone (real numbers stay out of the repo). Needs `WHATSAPP_MODE=openwa` + OpenWA linked.
+
 ## Quick curls
 ```bash
 curl -s localhost:8000/turn -H 'Content-Type: application/json' -d '{"mode":"text","text":"Paytm, pachaas cash Maggi"}' | jq '.intent,.reply_text'
