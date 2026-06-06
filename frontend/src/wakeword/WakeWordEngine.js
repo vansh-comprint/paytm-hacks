@@ -204,6 +204,12 @@ export class WakeWordEngine {
         }
     }
 
+    // The live mic stream the detector is using. The app records the command from THIS same stream
+    // (one getUserMedia, no contention) so the engine keeps running and re-arms reliably.
+    getStream() {
+        return this._mediaStream || null;
+    }
+
     async runWav(buffer) {
         if (!this._loaded) throw new Error('Call load() before runWav()');
         this._resetState();

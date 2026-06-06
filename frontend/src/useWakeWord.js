@@ -1,6 +1,6 @@
 // Wake-word engine (openWakeWord via WASM). Listens for the bundled "hey jarvis" / "alexa"
-// (no training). Exposes pause()/resume() so the recorder can take the mic during a capture and
-// the engine re-arms cleanly afterwards (fixes "only works once" mic contention).
+// (no training). Exposes getStream() so the app records the command from the engine's OWN mic
+// stream — one getUserMedia, the engine never stops, so it re-arms reliably (fixes "only works once").
 import { useCallback, useEffect, useRef, useState } from 'react';
 import WakeWordEngine, { MODEL_FILE_MAP } from './wakeword/index.js';
 
@@ -49,16 +49,8 @@ export function useWakeWord({ enabled, onWake }) {
     };
   }, [enabled]);
 
-  // release the mic so a recorder can take it; engine stays loaded
-  const pause = useCallback(() => { try { engineRef.current?.stop(); } catch { /* noop */ } }, []);
-  // re-acquire the mic and listen again (no re-download)
-  const resume = useCallback(() => {
-    const e = engineRef.current;
-    if (!e) return;
-    e.start()
-      .then(() => setStatus('armed (say “hey jarvis” / “alexa”)'))
-      .catch(() => { /* noop */ });
-  }, []);
+  // the engine's live mic stream — the app records the wake command from it (no second mic)
+  const getStream = useCallback(() => engineRef.current?.getStream?.() ?? null, []);
 
-  return { status, pause, resume };
+  return { status, getStream };
 }
