@@ -129,13 +129,16 @@ export default function App() {
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <Brandmark online={online} />
 
-        <div className="mt-6 grid gap-5">
-          <div className="flex flex-col items-center pb-1 pt-2">
-            <Orb className="h-40 w-40 sm:h-48 sm:w-48" listening={recording || wakeEnabled} />
-            <p className="mt-1 deva text-[13.5px] text-muted">
-              {recording ? 'सुन रहा हूँ…' : 'बोलो — मैं सुन रहा हूँ'}
+        <div className="mt-2 grid gap-5">
+          <section className="relative flex flex-col items-center">
+            <Orb
+              className="pointer-events-none -my-8 h-[min(88vw,560px)] w-[min(88vw,560px)] sm:-my-12"
+              listening={recording || wakeEnabled}
+            />
+            <p className="deva -mt-2 text-[15px] text-muted">
+              {recording ? 'सुन रहा हूँ…' : 'बोलिए — मैं सुन रहा हूँ'}
             </p>
-          </div>
+          </section>
           <VoiceBar
             onSendText={sendText}
             recording={recording}
