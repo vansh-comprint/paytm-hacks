@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Galla · Dev B test harness</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 22px; max-width: 980px; }
+  h1 { font-size: 17px; margin: 0 0 2px; } .sub { color:#888; font-size:13px; margin:0 0 16px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  input[type=text]{ flex:1; min-width:280px; padding:9px 11px; border:1px solid #bbb; border-radius:8px; font-size:15px; }
+  button{ padding:9px 14px; border:0; border-radius:8px; background:#0b5; color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost{ background:#e5e7eb; color:#111; } button.rec{ background:#dc2626; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:760px){ .cols{ grid-template-columns:1fr; } }
+  pre{ background:#0b1020; color:#c8d3f5; padding:11px; border-radius:8px; overflow:auto; max-height:340px; font-size:12.5px; }
+  .card{ border:1px solid #ddd; border-radius:10px; padding:10px; margin:7px 0; } .pill{ background:#eef; border-radius:99px; padding:2px 9px; font-size:12px; margin-right:6px; }
+  .chips button{ background:#eef; color:#114; font-weight:500; margin:0 6px 6px 0; font-size:13px; }
+</style></head>
+<body>
+  <h1>🧮 Galla — Dev B test harness</h1>
+  <p class="sub">Backend-only tester (Octo owns the real UI). Exercises <code>/turn</code> · <code>/state</code> · <code>/collect/confirm</code>.</p>
+
+  <div class="row">
+    <input id="text" type="text" placeholder='e.g. "Paytm, pachaas cash Maggi"  /  "aaj ka hisaab"' onkeydown="if(event.key==='Enter')sendText()" />
+    <button onclick="sendText()">Send</button>
+    <button id="mic" class="rec" onclick="toggleMic()">● Rec</button>
+    <button class="ghost" onclick="refresh()">↻ State</button>
+    <button class="ghost" onclick="reset()">Reset</button>
+  </div>
+  <div class="chips">
+    <button onclick="quick('Paytm, pachaas cash Maggi')">pachaas cash Maggi</button>
+    <button onclick="quick('sau rupaye online doodh')">sau online doodh</button>
+    <button onclick="quick('do logon ne Maggi maangi khatam thi')">Maggi khatam</button>
+    <button onclick="quick('Ramesh ko paanch sau ka udhaar likh do')">Ramesh udhaar</button>
+    <button onclick="quick('aaj ka hisaab')">aaj ka hisaab 🔊</button>
+    <button onclick="quick('kiska udhaar baaki hai')">kiska udhaar 🔊</button>
+  </div>
+  <audio id="player" controls style="width:100%;margin:10px 0"></audio>
+
+  <div class="cols">
+    <div><h3>Last turn</h3><pre id="turn">—</pre>
+      <h3>Collections (open udhaar)</h3><div id="udhaar"></div></div>
+    <div><h3>EOD (hero)</h3><pre id="eod">—</pre>
+      <h3>State</h3><pre id="state">—</pre></div>
+  </div>
+
+<script>
+const API = location.origin;
+async function turn(body){
+  const r = await fetch(API+"/turn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j = await r.json();
+  document.getElementById("turn").textContent = JSON.stringify(j,null,2);
+  if(j.reply_audio_url){ const p=document.getElementById("player"); p.src=j.reply_audio_url; p.play().catch(()=>{}); }
+  refresh();
+}
+function quick(t){ turn({mode:"text",text:t}); }
+function sendText(){ const t=document.getElementById("text").value.trim(); if(!t)return; turn({mode:"text",text:t}); document.getElementById("text").value=""; }
+async function refresh(){
+  const j = await (await fetch(API+"/state")).json();
+  document.getElementById("eod").textContent = JSON.stringify(j.eod,null,2);
+  document.getElementById("state").textContent = JSON.stringify({sales:j.sales,todos:j.todos,messages:j.messages},null,2);
+  const box=document.getElementById("udhaar"); box.innerHTML="";
+  (j.todos||[]).filter(t=>t.kind==="collect"&&t.status==="open").forEach(t=>{
+    const d=document.createElement("div"); d.className="card";
+    d.innerHTML=`<span class="pill">₹${t.amount}</span><b>${t.customer}</b> ${t.item?("— "+t.item):""} ${t.reminded?'<span class="pill">reminded</span>':''}
+      <br><button onclick="collect('${t.id}')" style="margin-top:7px">Send reminder</button>`;
+    box.appendChild(d);
+  });
+}
+async function collect(id){
+  const j = await (await fetch(API+"/collect/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({udhaar_id:id})})).json();
+  alert((j.message?.mock===false?"✅ Sent on WhatsApp!\n\n":"📋 Mock card (WHATSAPP_MODE=mock):\n\n")+(j.message?.body||JSON.stringify(j))); refresh();
+}
+async function reset(){ await fetch(API+"/reset",{method:"POST"}); refresh(); }
+let rec,chunks=[],on=false;
+async function toggleMic(){
+  const b=document.getElementById("mic");
+  if(!on){ const s=await navigator.mediaDevices.getUserMedia({audio:true}); rec=new MediaRecorder(s); chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=async()=>{ const blob=new Blob(chunks,{type:"audio/webm"}); const b64=await blobToB64(blob);
+      turn({mode:"wake",audioBase64:b64}); s.getTracks().forEach(t=>t.stop()); };
+    rec.start(); on=true; b.textContent="■ Stop";
+  } else { rec.stop(); on=false; b.textContent="● Rec"; }
+}
+const blobToB64 = b => new Promise(res=>{ const r=new FileReader(); r.onloadend=()=>res(r.result.split(",")[1]); r.readAsDataURL(b); });
+refresh();
+</script>
+</body></html>

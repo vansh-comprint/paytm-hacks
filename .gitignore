@@ -1,0 +1,24 @@
+# secrets
+**/.env
+
+# node
+node_modules/
+npm-debug.log*
+
+# runtime artifacts
+backend/audio/
+
+# python (legacy, if any local venv lingers)
+.venv/
+__pycache__/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+# local session tracking
+.claude-sessions/
+
+# scratch debug files
+backend/_*.mjs

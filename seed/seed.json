@@ -1,0 +1,37 @@
+{
+  "contacts": [
+    { "id": "c1", "name": "Ramesh Kumar", "phone": "+919812345671" },
+    { "id": "c2", "name": "Suresh Patel", "phone": "+919812345672" },
+    { "id": "c3", "name": "Anita Sharma", "phone": "+919812345673" },
+    { "id": "c4", "name": "Vijay Singh", "phone": "+919812345674" },
+    { "id": "c5", "name": "Pooja Verma", "phone": "+919812345675" }
+  ],
+  "items": [
+    { "id": "i1", "name": "Milk", "unit": "litre", "price": 60 },
+    { "id": "i2", "name": "Sugar", "unit": "kg", "price": 45 },
+    { "id": "i3", "name": "Rice", "unit": "kg", "price": 60 },
+    { "id": "i4", "name": "Bread", "unit": "loaf", "price": 40 },
+    { "id": "i5", "name": "Eggs", "unit": "dozen", "price": 84 },
+    { "id": "i6", "name": "Tea", "unit": "packet", "price": 140 },
+    { "id": "i7", "name": "Biscuits", "unit": "packet", "price": 30 },
+    { "id": "i8", "name": "Maggi", "unit": "packet", "price": 14 },
+    { "id": "i9", "name": "Cooking Oil", "unit": "litre", "price": 150 },
+    { "id": "i10", "name": "Atta", "unit": "kg", "price": 50 }
+  ],
+  "upi_txns": [
+    { "ts": "2026-06-06T09:12:00", "amount": 120, "ref": "UPI8842", "customer": "walk-in" },
+    { "ts": "2026-06-06T09:48:00", "amount": 60, "ref": "UPI8843", "customer": "walk-in" },
+    { "ts": "2026-06-06T10:25:00", "amount": 250, "ref": "UPI8844", "customer": "Anita Sharma" },
+    { "ts": "2026-06-06T11:05:00", "amount": 45, "ref": "UPI8845", "customer": "walk-in" },
+    { "ts": "2026-06-06T18:11:00", "amount": 300, "ref": "UPI8846", "customer": "walk-in" },
+    { "ts": "2026-06-06T18:40:00", "amount": 84, "ref": "UPI8847", "customer": "Vijay Singh" },
+    { "ts": "2026-06-06T19:05:00", "amount": 140, "ref": "UPI8848", "customer": "walk-in" },
+    { "ts": "2026-06-06T19:22:00", "amount": 56, "ref": "UPI8849", "customer": "walk-in" },
+    { "ts": "2026-06-06T19:45:00", "amount": 200, "ref": "UPI8850", "customer": "Pooja Verma" },
+    { "ts": "2026-06-06T20:05:00", "amount": 90, "ref": "UPI8851", "customer": "walk-in" }
+  ],
+  "udhaar": [
+    { "ts": "2026-06-06T10:00:00", "customer": "Ramesh Kumar", "item": "monthly groceries", "amount": 500 },
+    { "ts": "2026-06-06T12:00:00", "customer": "Suresh Patel", "item": "rice and oil", "amount": 850 }
+  ]
+}
