@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, Vec3 } from 'ogl';
 
-// Galla's presence — a large, soft Paytm-blue orb (Apple-ish), no neon, no dark fringe.
-// Edges fade via ALPHA (not toward black), so it melts into the light page.
-// Reacts to the mic when `listening`; gentle breath otherwise.
+// Galla's presence — a glossy 3D Paytm-blue orb (Apple-ish): real volume + highlight + rim light,
+// flowing surface, crisp circular edge (no box), no neon. Voice energizes + swells it.
 
 const VERT = /* glsl */ `
   precision highp float;
@@ -13,7 +12,7 @@ const VERT = /* glsl */ `
 
 const FRAG = /* glsl */ `
   precision highp float;
-  uniform float iTime; uniform vec3 iResolution; uniform float rot; uniform float uVoice;
+  uniform float iTime; uniform vec3 iResolution; uniform float uVoice;
   varying vec2 vUv;
 
   vec3 hash33(vec3 p3){ p3=fract(p3*vec3(0.1031,0.11369,0.13787)); p3+=dot(p3,p3.yxz+19.19);
@@ -25,59 +24,57 @@ const FRAG = /* glsl */ `
     vec4 h=max(0.6-vec4(dot(d0,d0),dot(d1,d1),dot(d2,d2),dot(d3,d3)),0.0);
     vec4 n=h*h*h*h*vec4(dot(d0,hash33(i)),dot(d1,hash33(i+i1)),dot(d2,hash33(i+i2)),dot(d3,hash33(i+1.0)));
     return dot(vec4(31.316),n); }
-  float light1(float i,float a,float d){ return i/(1.0+d*a); }
-  float light2(float i,float a,float d){ return i/(1.0+d*d*a); }
-
-  // Paytm light palette — NO dark color anywhere (so there is no black shadow on white).
-  const vec3 cDeep  = vec3(0.05, 0.46, 0.95);   // Paytm blue
-  const vec3 cMid   = vec3(0.32, 0.66, 1.00);   // brighter sky
-  const vec3 cLight = vec3(0.82, 0.91, 1.00);   // soft base (was navy)
-  const float innerRadius = 0.58;
-  const float noiseScale = 0.7;
-
-  // returns rgb (always light) + soft alpha mask
-  vec4 orb(vec2 uv) {
-    float ang = atan(uv.y, uv.x);
-    float len = length(uv);
-    float invLen = len > 0.0 ? 1.0/len : 0.0;
-    float t = iTime * (0.42 + uVoice * 0.5);
-    float n0 = snoise3(vec3(uv * noiseScale, t)) * 0.5 + 0.5;
-    float r0 = mix(mix(innerRadius,1.0,0.4), mix(innerRadius,1.0,0.6), n0);
-    float d0 = distance(uv, (r0*invLen)*uv);
-    float v0 = light1(1.0, 10.0, d0); v0 *= smoothstep(r0*1.05, r0, len);
-    float cl = cos(ang + iTime*1.4) * 0.5 + 0.5;
-    float a = iTime * -0.9;
-    vec2 pos = vec2(cos(a), sin(a)) * r0;
-    float v1 = light2(0.9, 6.0, distance(uv,pos)) * light1(1.0, 50.0, d0);
-
-    vec3 col = mix(cDeep, cMid, cl);
-    col = mix(cLight, col, v0);          // light base, bluer where lit
-    col = col + v1 * (0.45 + uVoice*0.4); // soft highlight, livelier with voice
-    col = clamp(col, 0.0, 1.0);
-
-    // soft alpha: full inside, feathered to 0 at the rim -> melts into the page (no fringe)
-    float core = smoothstep(1.02, innerRadius*0.92, len);
-    float halo = smoothstep(1.18, 0.45, len) * 0.5;
-    float alpha = clamp(max(core, halo) * (0.85 + 0.15*v0), 0.0, 1.0);
-    return vec4(col, alpha);
-  }
 
   void main() {
     vec2 fragCoord = vUv * iResolution.xy;
     vec2 center = iResolution.xy * 0.5;
     float size = min(iResolution.x, iResolution.y);
-    vec2 uv = (fragCoord - center) / size * 1.55;   // 1.55 -> the orb fills more of the box
-    float s = sin(rot), c = cos(rot);
-    uv = vec2(c*uv.x - s*uv.y, s*uv.x + c*uv.y);
-    uv *= (1.0 - uVoice * 0.10);                     // gently swells with your voice
-    uv.x += uVoice * 0.05 * sin(uv.y*7.0 + iTime*2.2);
-    uv.y += uVoice * 0.05 * sin(uv.x*7.0 + iTime*2.2);
-    vec4 o = orb(uv);
-    gl_FragColor = vec4(o.rgb * o.a, o.a);           // premultiplied -> clean soft edge
+    vec2 p = (fragCoord - center) / size * 2.0;
+
+    // gentle voice swell + wobble
+    p *= (1.0 - uVoice * 0.08);
+    p += uVoice * 0.035 * vec2(sin(iTime*3.0 + p.y*6.0), cos(iTime*2.6 + p.x*6.0));
+
+    float radius = 0.92;
+    float r = length(p);
+    float alpha = smoothstep(radius, radius - 0.05, r);   // crisp-soft circular edge, contained
+    if (alpha <= 0.001) { gl_FragColor = vec4(0.0); return; }
+
+    // fake sphere normal -> 3D volume
+    float z = sqrt(max(0.0, radius*radius - r*r)) / radius;
+    vec3 N = normalize(vec3(p / radius, z));
+    vec3 L = normalize(vec3(-0.35, 0.55, 0.85));
+    float diff = clamp(dot(N, L), 0.0, 1.0);
+
+    // flowing surface for life
+    float t = iTime * (0.22 + uVoice * 0.35);
+    float fl  = snoise3(vec3(p * 2.1, t)) * 0.5 + 0.5;
+    float fl2 = snoise3(vec3(p * 4.4 - 3.0, t * 0.8)) * 0.5 + 0.5;
+
+    // Paytm palette: deep navy-blue in shadow -> blue -> bright sky in light
+    vec3 deep = vec3(0.02, 0.22, 0.62);
+    vec3 blue = vec3(0.05, 0.49, 0.95);
+    vec3 sky  = vec3(0.60, 0.83, 1.00);
+    vec3 col = mix(deep, blue, diff);
+    col = mix(col, sky, smoothstep(0.5, 1.0, diff) * (0.5 + 0.3 * fl));
+    col = mix(col, blue, fl2 * 0.22);                       // subtle flowing variation
+
+    // cool glassy rim (fresnel)
+    float fres = pow(1.0 - z, 2.4);
+    col += sky * fres * (0.30 + 0.35 * uVoice);
+
+    // specular highlight (glossy)
+    vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));
+    float spec = pow(clamp(dot(N, H), 0.0, 1.0), 30.0);
+    col += vec3(1.0) * spec * 0.55;
+
+    col += blue * uVoice * 0.22;                            // voice brightens
+    col = clamp(col, 0.0, 1.0);
+    gl_FragColor = vec4(col * alpha, alpha);                // premultiplied
   }
 `;
 
-export default function Orb({ className, listening = false, onLevel, idleSpin = 0.16 }) {
+export default function Orb({ className, listening = false, onLevel }) {
   const ctn = useRef(null);
   const listeningRef = useRef(listening);
   listeningRef.current = listening;
@@ -119,7 +116,7 @@ export default function Orb({ className, listening = false, onLevel, idleSpin = 
       analyser.getByteFrequencyData(dataArr);
       let sum = 0;
       for (let i = 0; i < dataArr.length; i++) { const v = dataArr[i] / 255; sum += v * v; }
-      return Math.min(Math.sqrt(sum / dataArr.length) * 6.0, 1); // more sensitive
+      return Math.min(Math.sqrt(sum / dataArr.length) * 6.0, 1);
     };
 
     try {
@@ -133,7 +130,7 @@ export default function Orb({ className, listening = false, onLevel, idleSpin = 
 
       program = new Program(gl, {
         vertex: VERT, fragment: FRAG,
-        uniforms: { iTime: { value: 0 }, iResolution: { value: new Vec3(1, 1, 1) }, rot: { value: 0 }, uVoice: { value: 0 } },
+        uniforms: { iTime: { value: 0 }, iResolution: { value: new Vec3(1, 1, 1) }, uVoice: { value: 0 } },
       });
       const mesh = new Mesh(gl, { geometry: new Triangle(gl), program });
 
@@ -145,19 +142,17 @@ export default function Orb({ className, listening = false, onLevel, idleSpin = 
       };
       window.addEventListener('resize', resize); resize();
 
-      let last = 0, curRot = 0, lvl = 0;
+      let last = 0, lvl = 0;
       const tick = (t) => {
         raf = requestAnimationFrame(tick);
-        const dt = (t - last) * 0.001; last = t;
+        last = t;
         program.uniforms.iTime.value = t * 0.001;
         if (listeningRef.current && !micOn) startMic();
         if (!listeningRef.current && micOn) stopMic();
         const target = (listeningRef.current && micOn) ? level() : 0;
-        lvl = lvl * 0.78 + target * 0.22;            // smooth, feelsy
+        lvl = lvl * 0.8 + target * 0.2;
         onLevelRef.current?.(lvl);
         program.uniforms.uVoice.value = lvl;
-        curRot += dt * (idleSpin + lvl * 1.4);
-        program.uniforms.rot.value = curRot;
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         renderer.render({ scene: mesh });
       };
@@ -173,7 +168,7 @@ export default function Orb({ className, listening = false, onLevel, idleSpin = 
     } catch {
       return () => {};
     }
-  }, [idleSpin]);
+  }, []);
 
   return <div ref={ctn} className={className} />;
 }

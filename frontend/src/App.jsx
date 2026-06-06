@@ -130,12 +130,12 @@ export default function App() {
         <Brandmark online={online} />
 
         <div className="mt-2 grid gap-5">
-          <section className="relative flex flex-col items-center">
+          <section className="relative flex flex-col items-center pt-1">
             <Orb
-              className="pointer-events-none -my-8 h-[min(88vw,560px)] w-[min(88vw,560px)] sm:-my-12"
+              className="pointer-events-none h-[min(64vw,380px)] w-[min(64vw,380px)]"
               listening={recording || wakeEnabled}
             />
-            <p className="deva -mt-2 text-[15px] text-muted">
+            <p className="deva -mt-3 text-[15px] text-muted">
               {recording ? 'सुन रहा हूँ…' : 'बोलिए — मैं सुन रहा हूँ'}
             </p>
           </section>
