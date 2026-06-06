@@ -248,7 +248,7 @@ export default function App() {
           {mode === 'talk' && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-panel-2 px-3.5 py-2 text-[12px]">
               <span className="font-semibold text-ink">wake score <span className="tnum">{diag.score.toFixed(2)}</span></span>
-              <span className="text-muted">fires &gt; 0.40</span>
+              <span className="text-muted">fires &gt; 0.30</span>
               <span className={diag.speech ? 'font-medium text-wa' : 'text-muted'}>● speech {diag.speech ? 'detected' : 'idle'}</span>
               <button onClick={runSelfTest} className="ml-auto rounded-lg bg-brand-ink px-2.5 py-1 font-semibold text-surface">Self-test</button>
               {selfTest !== null && (

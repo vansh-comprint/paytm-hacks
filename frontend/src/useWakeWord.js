@@ -23,7 +23,7 @@ export function useWakeWord({ enabled, onWake }) {
       ortWasmPath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/',
       modelFiles: MODEL_FILES,
       keywords: ACTIVE_KEYWORDS,
-      detectionThreshold: 0.4,
+      detectionThreshold: 0.3, // speech is detected but scores sit low -> easier trigger
       cooldownMs: 1500,
     });
     engineRef.current = engine;
@@ -37,7 +37,7 @@ export function useWakeWord({ enabled, onWake }) {
 
     setStatus('loading…');
     engine.load()
-      .then(() => engine.start())
+      .then(() => engine.start({ gain: 1.6 })) // amplify the mic into the detector -> higher scores
       .then(() => !cancelled && setStatus('armed (say “hey jarvis” / “alexa”)'))
       .catch((e) => !cancelled && setStatus('error: ' + (e?.message || e)));
 
