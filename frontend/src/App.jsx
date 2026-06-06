@@ -136,7 +136,20 @@ export default function App() {
     setTimeout(stopRec, WAKE_CAPTURE_MS);
   }, [startRec, stopRec]);
 
-  const { status: wakeStatus } = useWakeWord({ enabled: mode === 'talk', onWake });
+  const { status: wakeStatus, getScores, isSpeechActive, testWav } = useWakeWord({ enabled: mode === 'talk', onWake });
+
+  // live diagnostics so we can SEE the wake engine (score, VAD speech) instead of guessing
+  const [diag, setDiag] = useState({ score: 0, speech: false });
+  const [selfTest, setSelfTest] = useState(null);
+  useEffect(() => {
+    if (mode !== 'talk') { setDiag({ score: 0, speech: false }); return; }
+    const id = setInterval(() => {
+      const scores = Object.values(getScores());
+      setDiag({ score: scores.length ? Math.max(...scores) : 0, speech: isSpeechActive() });
+    }, 150);
+    return () => clearInterval(id);
+  }, [mode, getScores, isSpeechActive]);
+  const runSelfTest = async () => { setSelfTest('run'); setSelfTest(await testWav()); };
 
   // ambient / Listen: continuous chunks, log-only, bottom nudge (no spoken reply); feeds the orb level
   useEffect(() => {
@@ -229,6 +242,20 @@ export default function App() {
             wakeStatus={wakeStatus}
             busy={busy}
           />
+
+          {mode === 'talk' && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-line bg-panel-2 px-3.5 py-2 text-[12px]">
+              <span className="font-semibold text-ink">wake score <span className="tnum">{diag.score.toFixed(2)}</span></span>
+              <span className="text-muted">fires &gt; 0.40</span>
+              <span className={diag.speech ? 'font-medium text-wa' : 'text-muted'}>● speech {diag.speech ? 'detected' : 'idle'}</span>
+              <button onClick={runSelfTest} className="ml-auto rounded-lg bg-brand-ink px-2.5 py-1 font-semibold text-surface">Self-test</button>
+              {selfTest !== null && (
+                <span className="text-ink">
+                  offline: {selfTest === 'run' ? '…' : typeof selfTest === 'number' ? selfTest.toFixed(2) + (selfTest > 0.5 ? ' ✓ pipeline OK' : ' ⚠ low') : 'n/a'}
+                </span>
+              )}
+            </div>
+          )}
 
           {reply && (
             <div

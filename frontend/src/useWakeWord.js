@@ -49,8 +49,19 @@ export function useWakeWord({ enabled, onWake }) {
     };
   }, [enabled]);
 
-  // the engine's live mic stream — the app records the wake command from it (no second mic)
-  const getStream = useCallback(() => engineRef.current?.getStream?.() ?? null, []);
+  // ---- diagnostics (so we can SEE what the engine is doing instead of guessing) ----
+  const getScores = useCallback(() => engineRef.current?.getScores?.() ?? {}, []);
+  const isSpeechActive = useCallback(() => engineRef.current?.isSpeechActive?.() ?? false, []);
+  // Offline self-test: run the bundled "hey jarvis" sample through the pipeline (no mic). A high
+  // score proves model + preprocessing work; then any live failure is mic/VAD/threshold, not the model.
+  const testWav = useCallback(async () => {
+    const e = engineRef.current;
+    if (!e) return null;
+    try {
+      const buf = await (await fetch('/openwakeword/hey_jarvis_11-2.wav')).arrayBuffer();
+      return await e.runWav(buf);
+    } catch { return null; }
+  }, []);
 
-  return { status, getStream };
+  return { status, getScores, isSpeechActive, testWav };
 }

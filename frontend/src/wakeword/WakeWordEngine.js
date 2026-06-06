@@ -204,10 +204,24 @@ export class WakeWordEngine {
         }
     }
 
-    // The live mic stream the detector is using. The app records the command from THIS same stream
-    // (one getUserMedia, no contention) so the engine keeps running and re-arms reliably.
+    // The live mic stream the detector is using.
     getStream() {
         return this._mediaStream || null;
+    }
+
+    // Latest score per keyword (for a live diagnostics readout) + whether VAD thinks speech is active.
+    getScores() {
+        const out = {};
+        if (this._keywordModels) {
+            for (const k of Object.keys(this._keywordModels)) {
+                const s = this._keywordModels[k].scores;
+                out[k] = (s && s.length) ? s[s.length - 1] : 0;
+            }
+        }
+        return out;
+    }
+    isSpeechActive() {
+        return !!this._isSpeechActive;
     }
 
     async runWav(buffer) {
