@@ -1,0 +1,10 @@
+# Wake-word training run artifacts (generated in Colab/locally).
+# The only output we keep is the trained model, which goes to
+# frontend/public/openwakeword/models/hey_paytm.onnx (committed there).
+my_custom_model/
+piper-sample-generator/
+*.npy
+*.tar
+audioset*/
+fma*/
+mit_rirs/

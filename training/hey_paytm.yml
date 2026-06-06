@@ -1,0 +1,49 @@
+# Galla — "Hey Paytm" wake-word training config (openWakeWord)
+# For use with: python openwakeword/train.py --training_config hey_paytm.yml --generate_clips --augment_clips --train_model
+# (The Colab notebook hey_paytm_training.ipynb sets the same values; this file is for running train.py directly.)
+
+model_name: "hey_paytm"               # -> my_custom_model/hey_paytm.onnx (+ .tflite)
+
+target_phrase:
+  - "hey paytm"
+
+# Words we explicitly do NOT want to fire on (beyond auto phoneme-overlap negatives).
+# "paytm" alone is short; add look-alikes here if we see false fires in testing.
+custom_negative_phrases: []
+
+# Demo-robust but ~1hr on a free Colab T4. Lower for speed, raise for reliability.
+n_samples: 20000
+n_samples_val: 2000
+tts_batch_size: 50
+augmentation_batch_size: 16
+
+piper_sample_generator_path: "./piper-sample-generator"
+output_dir: "./my_custom_model"
+
+rir_paths:
+  - "./mit_rirs"
+
+background_paths:
+  - "./audioset_16k"
+  - "./fma"
+background_paths_duplication_rate:
+  - 1
+  - 1
+
+false_positive_validation_data_path: "./validation_set_features.npy"
+augmentation_rounds: 1
+
+feature_data_files:
+  "ACAV100M_sample": "./openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  "ACAV100M_sample": 1024
+  "adversarial_negative": 50
+  "positive": 50
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 20000
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2
