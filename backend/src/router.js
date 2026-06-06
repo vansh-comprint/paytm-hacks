@@ -90,6 +90,9 @@ function normalize(raw, transcript) {
   if (out.amount == null && (out.type === 'log_sale' || out.type === 'log_udhaar')) {
     out.amount = hindiToNumber(transcript);
   }
+  if (typeof out.amount === 'number' && (!Number.isFinite(out.amount) || out.amount < 0)) {
+    out.amount = null; // never let a negative/NaN amount corrupt the ledger
+  }
   for (const k of ['item', 'customer']) {
     if (typeof out[k] === 'string') out[k] = out[k].trim() || null;
     else if (out[k] != null) out[k] = String(out[k]);

@@ -42,6 +42,7 @@ export function computeEod() {
   const upiSeed = sum(store.upiTxns);
   const upi = upiFromSales + upiSeed;
   const expenses = sum(store.expenses);
+  const cashExpenses = sum(store.expenses.filter((e) => e.type !== 'upi')); // only cash leaves the drawer
   const start = busiestWindow();
   const misses = store.todos
     .filter((t) => t.kind === 'restock' && t.status === 'open')
@@ -51,7 +52,7 @@ export function computeEod() {
     cash,
     upi,
     expenses,
-    net_cash: cash - expenses,        // cash actually in the drawer
+    net_cash: cash - cashExpenses,    // cash actually in the drawer (UPI expenses don't touch it)
     sale_count: store.sales.length + store.upiTxns.length,
     busiest_hours: start == null ? null : `${pad(start)}:00–${pad(start + 2)}:00`,
     top_items: topItems(),

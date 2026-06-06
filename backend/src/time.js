@@ -13,7 +13,9 @@ export function parseWhen(phrase) {
   if ((m = p.match(/in\s+(\d+)\s*day/))) return iso(addMs(now, +m[1] * 86400000));
 
   if ((m = p.match(/tomorrow\s+(\d{1,2}):(\d{2})/))) return iso(at(now, +m[1], +m[2], 1));
-  if ((m = p.match(/today\s+(\d{1,2}):(\d{2})/))) return iso(rollIfPast(at(now, +m[1], +m[2], 0)));
+  // explicit "today" is honored as-is (fires on next tick if already past) — never silently rolled to tomorrow
+  if ((m = p.match(/today\s+(\d{1,2}):(\d{2})/))) return iso(at(now, +m[1], +m[2], 0));
+  // bare time / "H baje" is ambiguous → roll to tomorrow if already past
   if ((m = p.match(/(\d{1,2}):(\d{2})/))) return iso(rollIfPast(at(now, +m[1], +m[2], 0)));
   if ((m = p.match(/(\d{1,2})\s*baje/))) return iso(rollIfPast(at(now, +m[1], 0, 0)));
   return null;

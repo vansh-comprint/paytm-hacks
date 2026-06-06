@@ -23,9 +23,10 @@ export async function applyIntent(intent, { mode = 'text' } = {}) {
         store.reviews.push(review);
         return { changed: true, reply_text: `❓ ₹${amount} review ke liye rakha (aaya ya gaya, confirm karein).`, speak: false };
       }
-      // money paid out -> expense
+      // money paid out -> expense (track cash vs upi so net_cash stays correct)
       if (intent.direction === 'out') {
-        const exp = { id: nextId('exp'), ts: nowIso(), amount, note: intent.item || 'cash diya' };
+        const exp = { id: nextId('exp'), ts: nowIso(), amount, note: intent.item || 'paisa diya',
+          type: intent.pay_type === 'upi' ? 'upi' : 'cash' };
         store.expenses.push(exp);
         return { changed: true, reply_text: `💸 ₹${amount} kharcha note kiya.`, speak: false };
       }
@@ -73,6 +74,9 @@ export async function applyIntent(intent, { mode = 'text' } = {}) {
       const fireAt = parseWhen(intent.when);
       if (!fireAt) {
         return { changed: false, reply_text: 'Kab yaad dilaun? (jaise "6 baje" ya "do minute baad")', speak: false };
+      }
+      if (!amount || amount <= 0) {
+        return { changed: false, reply_text: `${customer} ka kitne rupaye ka reminder? Pehle udhaar likhwaaiye.`, speak: false };
       }
       if (intent.amount && !existing) {
         store.todos.push({ id: nextId('udh'), ts: nowIso(), kind: 'collect',
