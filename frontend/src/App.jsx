@@ -35,6 +35,7 @@ export default function App() {
   const nudgeId = useRef(0);
   const voiceLevelRef = useRef(0);     // shared mic level -> the orb (orb has no mic of its own)
   const meterStopRef = useRef(null);
+  const getStreamRef = useRef(null);   // returns the wake engine's live mic stream
 
   const refresh = useCallback(async () => {
     try { setState(await api.state()); setOnline(true); } catch { setOnline(false); }
@@ -93,51 +94,59 @@ export default function App() {
     }
   }, [playAudio, refresh]);
 
-  // one-shot capture (hold-to-talk + wake). Re-arms the wake engine afterwards.
+  // Record a command from `stream`. Only stop the tracks if WE own the stream (hold-to-talk).
+  // For the wake word we pass the ENGINE'S stream and never stop it -> no 2nd mic, clean re-arm.
+  const recordCommand = useCallback((stream, ownsStream) => {
+    if (recRef.current) return;
+    const stopMeter = attachMeter(stream);
+    const mime = pickAudioMime();
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => e.data?.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      stopMeter();
+      if (ownsStream) stream.getTracks().forEach((t) => t.stop());
+      recRef.current = null;
+      setRecording(false);
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      if (blob.size > 0) await sendTurn({ mode: 'wake', audioBase64: await blobToBase64(blob) });
+      else setActivated(false);
+    };
+    rec.start();
+    recRef.current = rec;
+    setRecording(true);
+  }, [attachMeter, sendTurn]);
+
+  // hold-to-talk: own a fresh stream
   const startRec = useCallback(async () => {
     if (recRef.current) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      meterStopRef.current = attachMeter(stream);
-      const mime = pickAudioMime();
-      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => e.data?.size && chunksRef.current.push(e.data);
-      rec.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' });
-        meterStopRef.current?.(); meterStopRef.current = null;
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        recRef.current = null;
-        setRecording(false);
-        if (blob.size > 0) await sendTurn({ mode: 'wake', audioBase64: await blobToBase64(blob) });
-        else setActivated(false);
-      };
-      rec.start();
-      recRef.current = rec;
-      setRecording(true);
+      recordCommand(stream, true);
     } catch {
-      setRecording(false);
       setActivated(false);
       setReply({ transcript: '', reply_text: 'Mic permission denied. Use the text box.' });
     }
-  }, [attachMeter, sendTurn]);
+  }, [recordCommand]);
 
   const stopRec = useCallback(() => {
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
   }, []);
 
-  // wake fired: chime + activation, then capture the command (own mic) and reply
+  // wake fired: chime + activation, then record from the ENGINE'S stream (no contention -> re-arms);
+  // fall back to a fresh mic if the engine stream isn't available, so it can never silent-fail.
   const onWake = useCallback(async () => {
     if (recRef.current) return;
     playChime();
     setActivated(true);
-    await startRec();
+    const es = getStreamRef.current?.();
+    if (es && es.active) recordCommand(es, false);
+    else await startRec();
     setTimeout(stopRec, WAKE_CAPTURE_MS);
-  }, [startRec, stopRec]);
+  }, [recordCommand, startRec, stopRec]);
 
-  const { status: wakeStatus, getScores, isSpeechActive, testWav } = useWakeWord({ enabled: mode === 'talk', onWake });
+  const { status: wakeStatus, getStream, getScores, isSpeechActive, testWav } = useWakeWord({ enabled: mode === 'talk', onWake });
+  getStreamRef.current = getStream;
 
   // live diagnostics so we can SEE the wake engine (score, VAD speech) instead of guessing
   const [diag, setDiag] = useState({ score: 0, speech: false });

@@ -49,6 +49,9 @@ export function useWakeWord({ enabled, onWake }) {
     };
   }, [enabled]);
 
+  // the engine's live mic stream — the app records the wake command from THIS (no 2nd getUserMedia)
+  const getStream = useCallback(() => engineRef.current?.getStream?.() ?? null, []);
+
   // ---- diagnostics (so we can SEE what the engine is doing instead of guessing) ----
   const getScores = useCallback(() => engineRef.current?.getScores?.() ?? {}, []);
   const isSpeechActive = useCallback(() => engineRef.current?.isSpeechActive?.() ?? false, []);
@@ -63,5 +66,5 @@ export function useWakeWord({ enabled, onWake }) {
     } catch { return null; }
   }, []);
 
-  return { status, getScores, isSpeechActive, testWav };
+  return { status, getStream, getScores, isSpeechActive, testWav };
 }
