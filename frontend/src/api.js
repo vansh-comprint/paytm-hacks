@@ -22,10 +22,16 @@ export const api = {
   base: BASE,
   // POST /turn { mode, text?, audioBase64? } -> TurnResponse
   turn: (body) => jpost('/turn', body),
-  // GET /state -> { sales, todos, messages, eod }
+  // GET /state -> { sales, todos, messages, eod, expenses, reviews, scheduled, calls, suppliers, ... }
   state: () => jget('/state'),
   // POST /collect/confirm { udhaar_id } -> { message }
   collectConfirm: (udhaar_id) => jpost('/collect/confirm', { udhaar_id }),
+  // --- agent endpoints (additive; see contract/types.ts) ---
+  procureConfirm: (todo_id) => jpost('/procure/confirm', { todo_id }),       // -> { message, call, todo }
+  reviewResolve: (review_id, resolution) => jpost('/review/resolve', { review_id, resolution }), // -> { review, eod }
+  todoDone: (todo_id) => jpost('/todo/done', { todo_id }),                   // -> { todo } (deterministic)
+  createReminder: (payload) => jpost('/reminders', payload),                // { udhaar_id? | customer+amount, item?, phone?, when } -> { scheduled }
+  cancelReminder: (id) => jpost('/reminders/cancel', { id }),               // -> { scheduled }
   // dev helpers
   health: () => jget('/health'),
   reset: () => jpost('/reset', {}),

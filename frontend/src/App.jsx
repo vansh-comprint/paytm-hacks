@@ -105,7 +105,11 @@ export default function App() {
 
   const sendText = (text) => sendTurn({ mode: 'text', text });
   const speakEod = () => sendTurn({ mode: 'text', text: 'aaj ka hisaab' });
-  const markDone = (t) => sendTurn({ mode: 'text', text: `${t.item || t.text || ''} ho gaya` });
+  // deterministic mark-done via /todo/done (was a fuzzy "X ho gaya" text turn that could mis-match)
+  const markDone = async (t) => {
+    try { await api.todoDone(t.id); await refresh(); }
+    catch { setOnline(false); }
+  };
 
   const sendReminder = async (t) => {
     setBusyTodo(t.id);
