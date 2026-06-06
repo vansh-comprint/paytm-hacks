@@ -11,9 +11,9 @@ import LooseEnds from './components/LooseEnds.jsx';
 import WhatsAppSent from './components/WhatsAppSent.jsx';
 import Nudges from './components/Nudge.jsx';
 
-const WAKE_CAPTURE_MS = 4500;   // record window after the wake word fires
-const AMBIENT_CHUNK_MS = 4500;  // ambient capture window per chunk
-const AMBIENT_SPEECH_GATE = 0.05; // skip near-silent ambient chunks (saves Sarvam calls)
+const WAKE_CAPTURE_MS = 4500;
+const AMBIENT_CHUNK_MS = 4500;
+const AMBIENT_SPEECH_GATE = 0.05;
 
 export default function App() {
   const [state, setState] = useState({ sales: [], todos: [], messages: [], eod: null });
@@ -23,7 +23,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [mode, setMode] = useState('off');      // 'off' | 'listen' | 'talk'
-  const [activated, setActivated] = useState(false); // wake fired, mid-interaction
+  const [activated, setActivated] = useState(false);
   const [nudges, setNudges] = useState([]);
   const [busyTodo, setBusyTodo] = useState('');
 
@@ -32,6 +32,11 @@ export default function App() {
   const recRef = useRef(null);
   const chunksRef = useRef([]);
   const nudgeId = useRef(0);
+  const voiceLevelRef = useRef(0);     // shared mic level -> the orb (orb has no mic of its own)
+  const meterStopRef = useRef(null);
+  const wakePausedRef = useRef(false); // did a wake capture pause the engine?
+  const pauseRef = useRef(null);
+  const resumeRef = useRef(null);
 
   const refresh = useCallback(async () => {
     try { setState(await api.state()); setOnline(true); } catch { setOnline(false); }
@@ -45,6 +50,26 @@ export default function App() {
     setTimeout(() => setNudges((n) => n.filter((x) => x.id !== id)), 5200);
   }, []);
 
+  // analyser tap on an existing stream -> feeds voiceLevelRef (no extra getUserMedia)
+  const attachMeter = useCallback((stream) => {
+    let actx, raf;
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = actx.createAnalyser();
+      analyser.fftSize = 512;
+      actx.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const loop = () => {
+        analyser.getByteFrequencyData(data);
+        let s = 0; for (let i = 0; i < data.length; i++) { const v = data[i] / 255; s += v * v; }
+        voiceLevelRef.current = Math.min(Math.sqrt(s / data.length) * 6, 1);
+        raf = requestAnimationFrame(loop);
+      };
+      loop();
+    } catch { /* noop */ }
+    return () => { cancelAnimationFrame(raf); try { actx && actx.close(); } catch { /* noop */ } voiceLevelRef.current = 0; };
+  }, []);
+
   const playAudio = useCallback((url) => {
     if (!url || !audioRef.current) return;
     audioRef.current.src = url;
@@ -52,7 +77,6 @@ export default function App() {
     audioRef.current.play().catch(() => setSpeaking(false));
   }, []);
 
-  // text / hold-to-talk / wake → shows the reply card + plays audio
   const sendTurn = useCallback(async (body) => {
     setBusy(true);
     try {
@@ -67,28 +91,34 @@ export default function App() {
       setReply({ transcript: '', reply_text: 'Backend offline. Start Deep’s backend on :8000.' });
     } finally {
       setBusy(false);
-      setActivated(false); // wake interaction over -> back to idle
+      setActivated(false);
     }
   }, [playAudio, refresh]);
 
-  // ---- one-shot mic capture (hold-to-talk + wake) ----
+  // one-shot capture (hold-to-talk + wake). Re-arms the wake engine afterwards.
   const startRec = useCallback(async () => {
     if (recRef.current) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+      meterStopRef.current = attachMeter(stream);
       const mime = pickAudioMime();
       const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       chunksRef.current = [];
       rec.ondataavailable = (e) => e.data?.size && chunksRef.current.push(e.data);
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' });
+        meterStopRef.current?.(); meterStopRef.current = null;
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
         recRef.current = null;
         setRecording(false);
-        if (blob.size > 0) await sendTurn({ mode: 'wake', audioBase64: await blobToBase64(blob) });
-        else setActivated(false);
+        try {
+          if (blob.size > 0) await sendTurn({ mode: 'wake', audioBase64: await blobToBase64(blob) });
+          else setActivated(false);
+        } finally {
+          if (wakePausedRef.current) { wakePausedRef.current = false; resumeRef.current?.(); } // re-arm wake word
+        }
       };
       rec.start();
       recRef.current = rec;
@@ -96,26 +126,31 @@ export default function App() {
     } catch {
       setRecording(false);
       setActivated(false);
+      if (wakePausedRef.current) { wakePausedRef.current = false; resumeRef.current?.(); }
       setReply({ transcript: '', reply_text: 'Mic permission denied. Use the text box.' });
     }
-  }, [sendTurn]);
+  }, [attachMeter, sendTurn]);
 
   const stopRec = useCallback(() => {
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
   }, []);
 
-  // wake word fired (Talk mode): chime + visible activation, capture, reply, idle
+  // wake fired: chime + activation, pause the engine (free the mic), capture, reply, re-arm
   const onWake = useCallback(async () => {
     if (recRef.current) return;
     playChime();
     setActivated(true);
+    wakePausedRef.current = true;
+    pauseRef.current?.();
     await startRec();
     setTimeout(stopRec, WAKE_CAPTURE_MS);
   }, [startRec, stopRec]);
 
-  const { status: wakeStatus } = useWakeWord({ enabled: mode === 'talk', onWake });
+  const { status: wakeStatus, pause, resume } = useWakeWord({ enabled: mode === 'talk', onWake });
+  pauseRef.current = pause;
+  resumeRef.current = resume;
 
-  // ---- ambient / Listen mode: continuous chunks, log-only, nudge at the bottom (no spoken reply) ----
+  // ambient / Listen: continuous chunks, log-only, bottom nudge (no spoken reply); feeds the orb level
   useEffect(() => {
     if (mode !== 'listen') return;
     let active = true, stream, rec, ctx, analyser, raf, peak = 0;
@@ -131,7 +166,9 @@ export default function App() {
           if (!active) return;
           analyser.getByteFrequencyData(data);
           let s = 0; for (let i = 0; i < data.length; i++) { const v = data[i] / 255; s += v * v; }
-          peak = Math.max(peak, Math.sqrt(s / data.length));
+          const lvl = Math.sqrt(s / data.length);
+          peak = Math.max(peak, lvl);
+          voiceLevelRef.current = Math.min(lvl * 6, 1);
           raf = requestAnimationFrame(measure);
         };
         measure();
@@ -143,13 +180,12 @@ export default function App() {
           const chunks = [];
           rec.ondataavailable = (e) => e.data?.size && chunks.push(e.data);
           rec.onstop = async () => {
-            const spoke = peak > AMBIENT_SPEECH_GATE;
-            if (active && spoke && chunks.length) {
+            if (active && peak > AMBIENT_SPEECH_GATE && chunks.length) {
               try {
                 const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
                 const r = await api.turn({ mode: 'ambient', audioBase64: await blobToBase64(blob) });
                 if (r.changed) { pushNudge(r.reply_text); await refresh(); }
-              } catch { /* ignore a dropped chunk */ }
+              } catch { /* dropped chunk */ }
             }
             if (active) cycle();
           };
@@ -161,6 +197,7 @@ export default function App() {
     })();
     return () => {
       active = false;
+      voiceLevelRef.current = 0;
       try {
         cancelAnimationFrame(raf);
         rec && rec.state !== 'inactive' && rec.stop();
@@ -186,8 +223,8 @@ export default function App() {
         <div className="mt-2 grid gap-5">
           <section className="relative flex flex-col items-center pt-1">
             <Orb
+              levelRef={voiceLevelRef}
               className={`pointer-events-none -my-6 h-[min(90vw,600px)] w-[min(90vw,600px)] transition-transform duration-500 ${activated ? 'scale-105' : ''}`}
-              listening={recording || mode === 'listen'}
             />
             <p className={`deva -mt-3 text-[15px] ${activated ? 'font-semibold text-brand' : 'text-muted'}`}>
               {activated ? 'सुन रहा हूँ…' : mode === 'listen' ? 'चुपचाप सुन रहा हूँ — बस बोलते रहिए' : mode === 'talk' ? 'बोलिए “Hey Jarvis”' : 'बोलिए — मैं सुन रहा हूँ'}

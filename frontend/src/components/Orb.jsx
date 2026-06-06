@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Renderer, Program, Mesh, Triangle, Vec3 } from 'ogl';
 
-// Galla's presence — the 21st.dev VoicePoweredOrb (your 21stdev.rtf), ported to JSX and tuned for Galla:
-//   • Paytm-blue palette (was purple/cyan)
-//   • edges fade via ALPHA, not toward black — so it sits on our LIGHT page with no black shadow
-//   • mic-reactive: your voice drives rotation + hover/distortion
-// Everything else (noise undulation, moving light, hue control) is the original orb.
+// Galla's presence — the 21st.dev VoicePoweredOrb (your 21stdev.rtf), Paytm-blue, non-premult edge.
+// It does NOT open the mic itself. It reacts to `levelRef` (a ref holding 0..1) that the app feeds
+// from whatever is already recording — so it's calm at idle and only comes alive on activation.
 
 const VERT = /* glsl */ `
   precision highp float;
@@ -31,8 +29,6 @@ const FRAG = /* glsl */ `
     vec4 n=h*h*h*h*vec4(dot(d0,hash33(i)),dot(d1,hash33(i+i1)),dot(d2,hash33(i+i2)),dot(d3,hash33(i+1.0)));
     return dot(vec4(31.316),n); }
 
-  // Paytm-blue palette (original was purple / cyan / deep-blue)
-  // light-only Paytm blues -> no dark/grey region anywhere (so no shadow on the white page)
   const vec3 baseColor1 = vec3(0.10, 0.48, 0.97);
   const vec3 baseColor2 = vec3(0.45, 0.77, 1.00);
   const vec3 baseColor3 = vec3(0.34, 0.62, 0.99);
@@ -59,12 +55,11 @@ const FRAG = /* glsl */ `
     float v1=light2(1.5,5.0,distance(uv,pos)); v1*=light1(1.0,50.0,d0);
     float v2=smoothstep(1.0,mix(innerRadius,1.0,n0*0.5),len);
     float v3=smoothstep(innerRadius,mix(innerRadius,1.0,0.5),len);
-
     vec3 col=mix(color1,color2,cl);
     col=mix(color3,col,v0);
-    col=col+v1;                          // keep the glow highlight (original)
+    col=col+v1;
     col=clamp(col,0.0,1.0);
-    float mask=clamp(v2*v3,0.0,1.0);     // original edge -> used as ALPHA (not multiplied into color)
+    float mask=clamp(v2*v3,0.0,1.0);
     return vec4(col,mask);
   }
   vec4 mainImage(vec2 fragCoord){
@@ -79,56 +74,19 @@ const FRAG = /* glsl */ `
   }
   void main(){
     vec4 col=mainImage(vUv*iResolution.xy);
-    gl_FragColor=vec4(col.rgb,col.a);   // NON-premultiplied (matches blendFunc) -> no dark edge fringe
+    gl_FragColor=vec4(col.rgb,col.a);
   }
 `;
 
-export default function Orb({ className, listening = false, onLevel, hue = 0 }) {
+export default function Orb({ className, levelRef, hue = 0 }) {
   const ctn = useRef(null);
-  const listeningRef = useRef(listening);
-  listeningRef.current = listening;
-  const onLevelRef = useRef(onLevel);
-  onLevelRef.current = onLevel;
-  const hueRef = useRef(hue);
-  hueRef.current = hue;
+  const lr = useRef(levelRef);
+  lr.current = levelRef;
 
   useEffect(() => {
     const container = ctn.current;
     if (!container) return;
     let renderer, gl, raf, program;
-    let audioCtx, analyser, micSource, mediaStream, dataArr, micOn = false;
-
-    const stopMic = () => {
-      try {
-        mediaStream?.getTracks().forEach((t) => t.stop());
-        micSource?.disconnect(); analyser?.disconnect();
-        if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
-      } catch { /* noop */ }
-      mediaStream = micSource = analyser = audioCtx = dataArr = null; micOn = false;
-    };
-    const startMic = async () => {
-      if (micOn) return;
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        });
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.35;
-        micSource = audioCtx.createMediaStreamSource(mediaStream);
-        micSource.connect(analyser);
-        dataArr = new Uint8Array(analyser.frequencyBinCount);
-        micOn = true;
-      } catch { micOn = false; }
-    };
-    const level = () => {
-      if (!analyser || !dataArr) return 0;
-      analyser.getByteFrequencyData(dataArr);
-      let sum = 0;
-      for (let i = 0; i < dataArr.length; i++) { const v = dataArr[i] / 255; sum += v * v; }
-      return Math.min(Math.sqrt(sum / dataArr.length) * 4.5, 1);
-    };
 
     try {
       renderer = new Renderer({ alpha: true, premultipliedAlpha: false, antialias: true, dpr: Math.min(window.devicePixelRatio || 1, 2) });
@@ -157,18 +115,13 @@ export default function Orb({ className, listening = false, onLevel, hue = 0 }) 
       window.addEventListener('resize', resize); resize();
 
       let last = 0, curRot = 0, lvl = 0;
-      const baseSpin = 0.3;
       const tick = (t) => {
         raf = requestAnimationFrame(tick);
         const dt = (t - last) * 0.001; last = t;
         program.uniforms.iTime.value = t * 0.001;
-        program.uniforms.hue.value = hueRef.current;
-        if (listeningRef.current && !micOn) startMic();
-        if (!listeningRef.current && micOn) stopMic();
-        const target = (listeningRef.current && micOn) ? level() : 0;
-        lvl = lvl * 0.75 + target * 0.25;
-        onLevelRef.current?.(lvl);
-        curRot += dt * (baseSpin + lvl * 2.4);
+        const target = lr.current?.current ?? 0;     // shared level (0 when idle -> calm)
+        lvl = lvl * 0.8 + target * 0.2;
+        curRot += dt * (0.28 + lvl * 2.2);
         program.uniforms.rot.value = curRot;
         program.uniforms.hover.value = Math.min(lvl * 2.0, 1.0);
         program.uniforms.hoverIntensity.value = Math.min(lvl * 0.8, 0.8);
@@ -180,7 +133,6 @@ export default function Orb({ className, listening = false, onLevel, hue = 0 }) 
       return () => {
         cancelAnimationFrame(raf);
         window.removeEventListener('resize', resize);
-        stopMic();
         try { container.contains(gl.canvas) && container.removeChild(gl.canvas); } catch { /* noop */ }
         gl.getExtension('WEBGL_lose_context')?.loseContext();
       };

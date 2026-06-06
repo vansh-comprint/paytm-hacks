@@ -16,7 +16,7 @@ export default function VoiceBar({
   };
 
   const hint =
-    mode === 'talk' ? `Say “Hey Jarvis” · ${wakeStatus}`
+    mode === 'talk' ? wakeStatus   // e.g. 'armed (say "hey jarvis" / "alexa")'
     : mode === 'listen' ? 'Ambient — Galla logs quietly, no reply'
     : 'Hold to talk is the demo-safe path';
 
