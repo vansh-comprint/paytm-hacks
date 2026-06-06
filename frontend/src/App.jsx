@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { api, blobToBase64, pickAudioMime } from './api.js';
 import { useWakeWord } from './useWakeWord.js';
+import Brandmark from './components/Brandmark.jsx';
 import VoiceBar from './components/VoiceBar.jsx';
-import EodBoard from './components/EodBoard.jsx';
-import LedgerFeed from './components/LedgerFeed.jsx';
-import TodoPanel from './components/TodoPanel.jsx';
-import CollectionsCard from './components/CollectionsCard.jsx';
-import './App.css';
+import Reveal from './components/Reveal.jsx';
+import Ledger from './components/Ledger.jsx';
+import LooseEnds from './components/LooseEnds.jsx';
+import WhatsAppSent from './components/WhatsAppSent.jsx';
 
-const WAKE_CAPTURE_MS = 4000; // how long we record after the wake word fires
+const WAKE_CAPTURE_MS = 4000; // record window after the wake word fires
 
 export default function App() {
   const [state, setState] = useState({ sales: [], todos: [], messages: [], eod: null });
-  const [online, setOnline] = useState(null); // null=unknown, true/false
-  const [reply, setReply] = useState(null);    // { transcript, reply_text }
+  const [online, setOnline] = useState(null);
+  const [reply, setReply] = useState(null);
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -55,7 +56,7 @@ export default function App() {
       return r;
     } catch {
       setOnline(false);
-      setReply({ transcript: '', reply_text: '⚠ Backend offline — start Deep’s backend on :8000.' });
+      setReply({ transcript: '', reply_text: 'Backend offline. Start Deep’s backend on :8000.' });
     } finally {
       setBusy(false);
     }
@@ -87,7 +88,7 @@ export default function App() {
       setRecording(true);
     } catch {
       setRecording(false);
-      setReply({ transcript: '', reply_text: '⚠ Mic permission denied — use the text box.' });
+      setReply({ transcript: '', reply_text: 'Mic permission denied. Use the text box.' });
     }
   }, [sendTurn]);
 
@@ -95,7 +96,6 @@ export default function App() {
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
   }, []);
 
-  // Wake word → record a fixed window, then send as mode:"wake".
   const onWake = useCallback(async () => {
     if (recRef.current) return;
     await startRec();
@@ -104,9 +104,8 @@ export default function App() {
 
   const { status: wakeStatus } = useWakeWord({ enabled: wakeEnabled, onWake });
 
-  // ---- actions ----
   const sendText = (text) => sendTurn({ mode: 'text', text });
-  const speakEod = () => sendTurn({ mode: 'text', text: 'aaj ka hisaab' }); // → spoken Hindi tally
+  const speakEod = () => sendTurn({ mode: 'text', text: 'aaj ka hisaab' });
   const markDone = (t) => sendTurn({ mode: 'text', text: `${t.item || t.text || ''} ho gaya` });
 
   const sendReminder = async (t) => {
@@ -122,54 +121,58 @@ export default function App() {
   };
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="logo">गल्ला</span>
-          <div>
-            <h1>Galla</h1>
-            <p className="tagline">the voice till — cash + UPI, reconciled</p>
-          </div>
-        </div>
-        <div className={`health ${online === false ? 'down' : online ? 'up' : ''}`}>
-          <span className="dot" />
-          {online === false ? 'backend offline' : online ? 'backend live' : 'connecting…'}
-        </div>
-      </header>
+    <div className="min-h-dvh bg-counter">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        <Brandmark online={online} />
 
-      <VoiceBar
-        onSendText={sendText}
-        recording={recording}
-        onMicDown={startRec}
-        onMicUp={stopRec}
-        wakeEnabled={wakeEnabled}
-        onToggleWake={() => setWakeEnabled((v) => !v)}
-        wakeStatus={wakeStatus}
-        busy={busy}
-      />
-
-      {reply && (
-        <div className="reply card">
-          {reply.transcript && <p className="reply-heard">“{reply.transcript}”</p>}
-          <p className="reply-text">{reply.reply_text}</p>
-        </div>
-      )}
-
-      <main className="grid">
-        <div className="col-main">
-          <EodBoard eod={state.eod} onSpeak={speakEod} speaking={speaking || busy} />
-          <LedgerFeed sales={state.sales} />
-        </div>
-        <div className="col-side">
-          <TodoPanel
-            todos={state.todos}
-            onSendReminder={sendReminder}
-            onMarkDone={markDone}
-            busyId={busyTodo}
+        <div className="mt-7 grid gap-5">
+          <VoiceBar
+            onSendText={sendText}
+            recording={recording}
+            onMicDown={startRec}
+            onMicUp={stopRec}
+            wakeEnabled={wakeEnabled}
+            onToggleWake={() => setWakeEnabled((v) => !v)}
+            wakeStatus={wakeStatus}
+            busy={busy}
           />
-          <CollectionsCard messages={state.messages} />
+
+          <AnimatePresence>
+            {reply && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="rounded-[var(--radius)] border border-line bg-[oklch(0.97_0.018_235)] px-4 py-3"
+              >
+                {reply.transcript && <p className="text-[12.5px] italic text-muted">“{reply.transcript}”</p>}
+                <p className="mt-0.5 deva text-[15px] font-medium leading-relaxed text-ink">{reply.reply_text}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Reveal eod={state.eod} onSpeak={speakEod} speaking={speaking || busy} />
+
+          <div className="grid gap-5 md:grid-cols-[1.25fr_1fr]">
+            <Ledger sales={state.sales} />
+            <div className="grid gap-5">
+              <LooseEnds
+                todos={state.todos}
+                onSendReminder={sendReminder}
+                onMarkDone={markDone}
+                busyId={busyTodo}
+              />
+              <WhatsAppSent messages={state.messages} />
+            </div>
+          </div>
+
+          <footer className="mt-2 pb-4 text-center text-[11px] text-muted">
+            Galla · Paytm <span className="text-brand">×</span> OctoDeep · animated number by{' '}
+            <a href="https://skiper-ui.com" target="_blank" rel="noreferrer" className="underline decoration-line">Skiper UI</a>
+          </footer>
         </div>
-      </main>
+      </div>
 
       <audio ref={audioRef} onEnded={() => setSpeaking(false)} hidden />
     </div>

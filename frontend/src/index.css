@@ -1,10 +1,53 @@
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
-  line-height: 1.5;
-  color-scheme: dark;
+@import "tailwindcss";
+
+/* ── Galla design system — Paytm × OctoDeep, light/daylight, OKLCH (never #000/#fff) ── */
+@theme {
+  --color-surface:    oklch(0.992 0.004 240);   /* tinted near-white counter */
+  --color-panel:      oklch(0.974 0.006 242);   /* raised surface */
+  --color-ink:        oklch(0.255 0.045 262);   /* deep navy ink, not black */
+  --color-ink-soft:   oklch(0.40 0.05 260);
+  --color-muted:      oklch(0.56 0.028 252);
+  --color-line:       oklch(0.915 0.013 246);
+  --color-line-soft:  oklch(0.945 0.009 246);
+
+  --color-brand:      oklch(0.72 0.152 233);     /* Paytm cyan ~#00B9F1 */
+  --color-brand-ink:  oklch(0.30 0.10 248);      /* Paytm navy, for emphasis */
+  --color-upi:        oklch(0.66 0.142 236);     /* digital money */
+  --color-cash:       oklch(0.80 0.135 76);      /* the cash Paytm can't see */
+  --color-cash-ink:   oklch(0.50 0.105 64);
+  --color-wa:         oklch(0.66 0.135 152);      /* whatsapp green, used sparingly */
+  --color-danger:     oklch(0.62 0.18 25);
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, sans-serif;
+  --font-sans:    "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-deva:    "Mukta", "Hanken Grotesk", sans-serif;
+
+  --radius: 0.95rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
-* { margin: 0; }
+
 html, body, #root { min-height: 100%; }
-body { background: #0b1020; color: #eaf0ff; }
-a { color: inherit; }
-button { font-family: inherit; }
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* tactile, restrained: faint "counter paper" dotted grid behind everything */
+.bg-counter {
+  background-image: radial-gradient(oklch(0.72 0.15 233 / 0.055) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  background-position: -8px -8px;
+}
+
+@utility tnum { font-variant-numeric: tabular-nums; }
+@utility deva { font-family: var(--font-deva); font-feature-settings: normal; }
+
+/* hide scrollbar on the inner feeds but keep scroll */
+.soft-scroll { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
