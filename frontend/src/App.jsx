@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, blobToBase64, pickAudioMime } from './api.js';
 import { useWakeWord } from './useWakeWord.js';
 import Brandmark from './components/Brandmark.jsx';
+import Orb from './components/Orb.jsx';
 import VoiceBar from './components/VoiceBar.jsx';
 import Reveal from './components/Reveal.jsx';
 import Ledger from './components/Ledger.jsx';
@@ -128,7 +129,13 @@ export default function App() {
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
         <Brandmark online={online} />
 
-        <div className="mt-7 grid gap-5">
+        <div className="mt-6 grid gap-5">
+          <div className="flex flex-col items-center pb-1 pt-2">
+            <Orb className="h-40 w-40 sm:h-48 sm:w-48" listening={recording || wakeEnabled} />
+            <p className="mt-1 deva text-[13.5px] text-muted">
+              {recording ? 'सुन रहा हूँ…' : 'बोलो — मैं सुन रहा हूँ'}
+            </p>
+          </div>
           <VoiceBar
             onSendText={sendText}
             recording={recording}
