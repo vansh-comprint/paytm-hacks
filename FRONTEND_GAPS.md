@@ -53,10 +53,17 @@ cash actually in the drawer = cash in − cash spent.
   *"₹1,400 cash in · ₹200 spent · **₹1,200 in the drawer**"*.
 
 ### 6. Scheduled reminders panel ✅
-*"Ramesh ko 6 baje yaad dilana"* schedules a job that auto-fires WhatsApp + a call. The owner can't see it.
+*"Ramesh ko 6 baje yaad dilana"* schedules a job that auto-fires WhatsApp + a call. The owner can't see it
+— and now can also **create/cancel** reminders straight from the UI.
 - **Add:** an **"Upcoming reminders"** strip from `GET /state.scheduled[]`
-  (`{ customer, amount, fireAt, status:"pending"|"fired" }`) — show a countdown for pending, ✓ for fired.
+  (`{ id, customer, amount, fireAt, status:"pending"|"fired" }`) — show a countdown for pending, ✓ for fired.
   Builds the trust beat: *"Galla will remind Ramesh at 6, even if you forget."*
+- **Create:** a "Remind" action → `POST /reminders { udhaar_id?, customer?, amount?, item?, phone?, when }`
+  → `{ scheduled }`. Pass either an `udhaar_id` (preferred — pulls customer/amount/phone) or
+  `customer + amount`, plus a `when` (`"in N minutes"` | `"today HH:MM"` | `"tomorrow HH:MM"` | `"6 baje"`…).
+  At fire time it auto-sends WhatsApp + a simulated Hindi call (lands in `/state.calls`, see #2).
+- **Cancel:** a ✕ on a pending row → `POST /reminders/cancel { id }` → `{ scheduled }`.
+- **Backend ready:** `POST /reminders`, `POST /reminders/cancel`, and `GET /state.scheduled` all live.
 
 ### 7. A first-class mode switch (Off · Listen · Talk)
 Ties #3 together — make the 3 modes one explicit control instead of an implicit text/wake split. Off = stop sending.
@@ -66,7 +73,7 @@ Ties #3 together — make the 3 modes one explicit control instead of an implici
 ## P2 — polish & roadmap (narrate, mostly)
 
 8. **"Hey Paytm" wake word** — swap `hey_jarvis` → `hey_paytm.onnx` when training finishes (Octo already tracking; the demo phrase is "Paytm").
-9. **Deterministic mark-done** — today `markDone` sends a fuzzy text turn (`"X ho gaya"`); it can mis-match on similar names. If you want a reliable Done button, say the word and I'll add `POST /todo/done { todo_id }` (⚙️ ~10 min backend).
+9. **Deterministic mark-done** ✅ — **available: `POST /todo/done { todo_id }`** → `{ todo }` (deterministic mark-done for any todo). Today `markDone` sends a fuzzy text turn (`"X ho gaya"`); it can mis-match on similar names. Switch the existing **Done** button off that text-turn hack onto this endpoint for a reliable, exact mark-done.
 10. **Empty/error/offline states** — friendly states when backend is offline or lists are empty (partly there); a tiny toast on send failure helps live.
 11. **Vision roadmap (slides, not build):** morning briefing, lapsed-regular nudges, cash-crunch warnings, the lending hook — all narrated per `VISION.md §9`.
 
@@ -77,4 +84,5 @@ The backend already serves **procurement orders, simulated-call audio, the revie
 reminders, and expenses/net-cash** — none of P0/P1 needs backend changes, just UI to render
 `/state.{calls,reviews,scheduled,suppliers}` + `eod.{expenses,net_cash,to_review}` and to wire
 `/procure/confirm` + `/review/resolve`. Full shapes in [`contract/types.ts`](contract/types.ts);
-poke them live at `/dev/dev.html`.
+poke them live at `/dev/dev.html`. Reminders are now read **and** write: create/cancel via
+`POST /reminders` + `POST /reminders/cancel` (#6), and there's a deterministic `POST /todo/done` (#9).

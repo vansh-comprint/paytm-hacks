@@ -80,7 +80,8 @@ async function refresh(){
 
   fill("orders", (j.todos||[]).filter(t=>t.kind==="restock"&&t.status==="open"), t=>
     `<span class="pill">restock</span><b>${t.item}</b> ${t.qty?("× "+t.qty):""}<br>
-     <button onclick="procure('${t.id}')" style="margin-top:6px">Confirm order → supplier</button>`);
+     <button onclick="procure('${t.id}')" style="margin-top:6px">Confirm order → supplier</button>
+     <button class="ghost" onclick="done('${t.id}')" style="margin-top:6px">Done</button>`);
 
   fill("reviews", (j.reviews||[]).filter(r=>r.status==="open"), r=>
     `<span class="pill">₹${r.amount}</span>${r.reason}<br>
@@ -90,13 +91,15 @@ async function refresh(){
 
   fill("udhaar", (j.todos||[]).filter(t=>t.kind==="collect"&&t.status==="open"), t=>
     `<span class="pill">₹${t.amount}</span><b>${t.customer}</b> ${t.item?("— "+t.item):""} ${t.reminded?'<span class="pill">reminded</span>':''}<br>
-     <button onclick="collect('${t.id}')" style="margin-top:6px">Send reminder</button>`);
+     <button onclick="collect('${t.id}')" style="margin-top:6px">Send reminder</button>
+     <button class="warn" onclick="schedule1m('${t.id}')" style="margin-top:6px">Schedule 1m</button>
+     <button class="ghost" onclick="done('${t.id}')" style="margin-top:6px">Done</button>`);
 
   const calls = (j.calls||[]).slice().reverse().map(c=>
     `<div class="card"><span class="pill">${c.kind}</span><b>${c.name}</b>
      ${c.audio_url?`<br><audio src="${API+c.audio_url}" controls style="width:100%;margin-top:5px"></audio>`:""}
      <div style="color:#888;font-size:12px">${c.script}</div></div>`).join("");
-  const sched = (j.scheduled||[]).map(s=>`<div class="card"><span class="pill">${s.status}</span>⏰ ${s.customer} ₹${s.amount} @ ${new Date(s.fireAt).toLocaleTimeString()}</div>`).join("");
+  const sched = (j.scheduled||[]).map(s=>`<div class="card"><span class="pill">${s.status}</span>⏰ ${s.customer} ₹${s.amount} @ ${new Date(s.fireAt).toLocaleTimeString()}${s.status==="pending"?` <button class="warn" onclick="cancelReminder('${s.id}')" style="margin-left:6px">Cancel</button>`:""}</div>`).join("");
   document.getElementById("calls").innerHTML = sched + calls || "—";
 }
 function fill(id, arr, tmpl){ const box=document.getElementById(id); box.innerHTML=""; arr.forEach(x=>{ const d=document.createElement("div"); d.className="card"; d.innerHTML=tmpl(x); box.appendChild(d); }); if(!arr.length) box.innerHTML='<span style="color:#999">—</span>'; }
@@ -104,6 +107,9 @@ function fill(id, arr, tmpl){ const box=document.getElementById(id); box.innerHT
 async function procure(id){ const j=await post("/procure/confirm",{todo_id:id}); alert((j.message?.mock===false?"✅ Order sent on WhatsApp!\n\n":"📋 Mock order:\n\n")+(j.message?.body||"")+"\n\n📞 Call: "+(j.call?.script||"")); refresh(); }
 async function resolve(id,res){ await post("/review/resolve",{review_id:id,resolution:res}); refresh(); }
 async function collect(id){ const j=await post("/collect/confirm",{udhaar_id:id}); alert((j.message?.mock===false?"✅ Sent on WhatsApp!\n\n":"📋 Mock card:\n\n")+(j.message?.body||"")); refresh(); }
+async function done(id){ await post("/todo/done",{todo_id:id}); refresh(); }
+async function schedule1m(id){ await post("/reminders",{udhaar_id:id,when:"in 1 minute"}); refresh(); }
+async function cancelReminder(id){ await post("/reminders/cancel",{id}); refresh(); }
 async function reset(){ await fetch(API+"/reset",{method:"POST"}); refresh(); }
 const post = async (path,body)=> (await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
 

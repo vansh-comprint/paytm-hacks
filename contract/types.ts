@@ -73,7 +73,7 @@ export interface Review { id: string; ts: string; amount: number; raw: string | 
 export interface Scheduled {
   id: string; ts: string; fireAt: string; kind: "collect";
   customer: string; customer_id?: string; phone?: string | null; amount: number; item?: string | null;
-  status: "pending" | "fired" | "error"; firedAt?: string; message_id?: string; call_id?: string;
+  status: "pending" | "fired" | "error" | "cancelled"; firedAt?: string; message_id?: string; call_id?: string;
 }
 export interface Call { id: string; ts: string; kind: "order" | "collection"; to: string | null; name: string; script: string; audio_url: string | null; }
 export interface Supplier { id: string; name: string; phone: string; supplies?: string; }
@@ -122,3 +122,22 @@ export interface ProcureResponse { message: Message; call: Call; todo: Todo; }
 // POST /review/resolve  (resolve an ambiguous-cash entry)
 export interface ReviewResolveRequest { review_id: string; resolution: "in" | "out" | "ignore"; }
 export interface ReviewResolveResponse { review: Review; eod: Eod; }
+
+// POST /todo/done  (mark any todo — collect or restock — as done)
+export interface TodoDoneRequest { todo_id: string; }  // todo_id = any Todo id
+export interface TodoDoneResponse { todo: Todo; }
+
+// POST /reminders  (schedule a collection reminder from the UI -> auto WhatsApp + simulated call at fireAt)
+export interface ScheduleReminderRequest {
+  udhaar_id?: string;   // a `collect` Todo id — reuses its customer/amount/phone/item
+  customer?: string;    // OR pass customer + amount directly
+  amount?: number;
+  item?: string;
+  phone?: string;
+  when: string;         // "in N minutes" | "in N hours" | "in N days" | "today HH:MM" | "tomorrow HH:MM" | "6 baje"
+}
+export interface ScheduleReminderResponse { scheduled: Scheduled; }
+
+// POST /reminders/cancel  (cancel a PENDING reminder; cancelled jobs never fire)
+export interface CancelReminderRequest { id: string; }   // id = a Scheduled job id
+export interface CancelReminderResponse { scheduled: Scheduled; }

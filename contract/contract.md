@@ -91,6 +91,19 @@ POST /procure/confirm  { todo_id }          // approve a pending `restock` todo
 
 POST /review/resolve   { review_id, resolution: "in"|"out"|"ignore" }
    -> { review, eod }                        // resolve an ambiguous-cash entry
+
+POST /todo/done        { todo_id }           // mark any todo (collect or restock) done; 404 if not found
+   -> { todo }                               // deterministic mark-done
+
+POST /reminders        { udhaar_id?, customer?, amount?, item?, phone?, when }
+   -> { scheduled }                          // schedule a collection reminder from the UI
+                                             // pass udhaar_id (a `collect` todo id, reuses its
+                                             // customer/amount/phone/item) OR customer+amount(+item/phone).
+                                             // `when` normalized like the router; 400 if unparseable or amount<=0.
+                                             // at fireAt: auto WhatsApp + simulated Hindi call.
+
+POST /reminders/cancel { id }                // cancel a PENDING reminder; 404 if not found
+   -> { scheduled }                          // status -> "cancelled"; cancelled jobs never fire
 ```
 
 **`/state` gained additive arrays:** `expenses[]`, `reviews[]`, `scheduled[]`, `calls[]`,

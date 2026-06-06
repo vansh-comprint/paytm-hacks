@@ -31,7 +31,7 @@ Open <http://localhost:8000/dev/dev.html> for a backend-only tester (type, mic, 
 
 Actions:
 - **Procurement** — *"cheeni khatam"* → pending `restock` todo → tap `POST /procure/confirm {todo_id}` → WhatsApp order to the one supplier **+ a simulated Hindi call** (`Call.audio_url`).
-- **Reminders** — *"Ramesh ko 6 baje yaad dilana"* → `set_reminder` schedules a job; the in-process scheduler auto-fires WhatsApp **+ simulated call** at the time. Plus tap-to-send now (`/collect/confirm`).
+- **Reminders** — *"Ramesh ko 6 baje yaad dilana"* → `set_reminder` schedules a job; the in-process scheduler auto-fires WhatsApp **+ simulated call** at the time. Plus tap-to-send now (`/collect/confirm`). The UI can also set + cancel scheduled reminders directly: `POST /reminders {udhaar_id?|customer,amount?,item?,phone?,when}` (`when` = *"in N minutes/hours/days"* | *"today/tomorrow HH:MM"* | *"6 baje"*) and `POST /reminders/cancel {id}`. And `POST /todo/done {todo_id}` deterministically marks any todo done.
 - **Calls are SIMULATED** (no telephony) — Bulbul Hindi "recordings" the UI plays. Real dialing is a fast-follow.
 
 > **Demo phone:** set `DEMO_PHONE=+91…` in `.env` and every contact + supplier routes to that one phone (real numbers stay out of the repo). Needs `WHATSAPP_MODE=openwa` + OpenWA linked.
@@ -42,6 +42,9 @@ curl -s localhost:8000/turn -H 'Content-Type: application/json' -d '{"mode":"tex
 curl -s localhost:8000/turn -H 'Content-Type: application/json' -d '{"mode":"text","text":"aaj ka hisaab"}'        | jq '.reply_text,.reply_audio_url'
 curl -s localhost:8000/state | jq .eod
 curl -s localhost:8000/collect/confirm -H 'Content-Type: application/json' -d '{"udhaar_id":"udh_1"}' | jq '.message.body'
+curl -s localhost:8000/todo/done       -H 'Content-Type: application/json' -d '{"todo_id":"todo_1"}'                       | jq '.todo'
+curl -s localhost:8000/reminders        -H 'Content-Type: application/json' -d '{"udhaar_id":"udh_1","when":"in 1 minute"}' | jq '.scheduled'
+curl -s localhost:8000/reminders/cancel -H 'Content-Type: application/json' -d '{"id":"sch_1"}'                            | jq '.scheduled'
 ```
 
 ## Real WhatsApp (upgrade, after core is green)

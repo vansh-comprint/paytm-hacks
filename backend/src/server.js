@@ -6,13 +6,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { config, requireKey } from './config.js';
-import { store, loadSeed, nextId, theSupplier, findTodo, findReview, nowIso } from './store.js';
+import { store, loadSeed, nextId, theSupplier, findTodo, findReview, matchContact, nowIso } from './store.js';
 import { route, emptyIntent } from './router.js';
 import { applyIntent } from './ledger.js';
 import { computeEod } from './eod.js';
 import { sendCollection, sendOrder } from './whatsapp.js';
 import { simulateCall } from './calls.js';
-import { startScheduler } from './scheduler.js';
+import { startScheduler, schedule } from './scheduler.js';
+import { parseWhen } from './time.js';
 import { AUDIO_DIR, saveWav } from './audio.js';
 import * as sarvam from './sarvam.js';
 
@@ -118,6 +119,50 @@ app.post('/review/resolve', (req, res) => {
   review.status = 'resolved';
   review.resolution = resolution || 'ignore';
   res.json({ review, eod: computeEod() });
+});
+
+// POST /todo/done { todo_id } -> { todo }   (deterministic mark-done for any todo)
+app.post('/todo/done', (req, res) => {
+  const { todo_id } = req.body || {};
+  const todo = findTodo(todo_id);
+  if (!todo) return res.status(404).json({ error: `todo '${todo_id}' not found` });
+  todo.status = 'done';
+  res.json({ todo });
+});
+
+// POST /reminders { udhaar_id? | (customer, amount), item?, when } -> { scheduled }
+// Schedule a collection reminder from the UI; at fireAt the scheduler sends WhatsApp + a simulated call.
+app.post('/reminders', (req, res) => {
+  const b = req.body || {};
+  const fireAt = parseWhen(b.when);
+  if (!fireAt) return res.status(400).json({ error: 'could not parse "when" (try "in 5 minutes", "today 18:00", "6 baje")' });
+
+  let customer; let customer_id; let phone; let amount; let item;
+  if (b.udhaar_id) {
+    const t = store.todos.find((x) => x.id === b.udhaar_id && x.kind === 'collect');
+    if (!t) return res.status(404).json({ error: `udhaar '${b.udhaar_id}' not found` });
+    ({ customer, customer_id, phone, amount, item } = t);
+  } else {
+    const c = matchContact(b.customer);
+    customer = c?.name || b.customer || 'Customer';
+    customer_id = c?.id;
+    phone = c?.phone || b.phone || null;
+    amount = Number(b.amount) || 0;
+    item = b.item || null;
+  }
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'a positive amount is required' });
+
+  const scheduled = schedule({ customer, customer_id, phone, amount, item, fireAt });
+  res.json({ scheduled });
+});
+
+// POST /reminders/cancel { id } -> { scheduled }   (cancel a pending reminder; cancelled jobs never fire)
+app.post('/reminders/cancel', (req, res) => {
+  const { id } = req.body || {};
+  const job = store.scheduled.find((s) => s.id === id);
+  if (!job) return res.status(404).json({ error: `reminder '${id}' not found` });
+  if (job.status === 'pending') { job.status = 'cancelled'; job.cancelledAt = nowIso(); }
+  res.json({ scheduled: job });
 });
 
 // --- dev helpers ---
