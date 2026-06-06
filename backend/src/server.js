@@ -13,6 +13,7 @@ import { computeEod } from './eod.js';
 import { sendCollection, sendOrder } from './whatsapp.js';
 import { simulateCall } from './calls.js';
 import { startScheduler, schedule } from './scheduler.js';
+import { computeSuggestions, briefingText } from './suggest.js';
 import { parseWhen } from './time.js';
 import { AUDIO_DIR, saveWav } from './audio.js';
 import * as sarvam from './sarvam.js';
@@ -32,19 +33,24 @@ app.use('/dev', express.static(PUBLIC_DIR));
 
 // POST /turn  { mode, text?, audioBase64? } -> { transcript, intent, reply_text, reply_audio_url?, changed }
 app.post('/turn', async (req, res) => {
+  const t0 = Date.now();
   try {
     const { mode = 'text', text, audioBase64 } = req.body || {};
 
     let transcript = (text || '').trim();
+    let sttMs = 0;
     if (audioBase64) {
       const buf = Buffer.from(String(audioBase64).replace(/^data:[^;]+;base64,/, ''), 'base64');
-      if (buf.length) transcript = (await sarvam.stt(buf)).transcript;
+      if (buf.length) { const s0 = Date.now(); transcript = (await sarvam.stt(buf)).transcript; sttMs = Date.now() - s0; }
     }
     if (!transcript) {
+      console.log(`[turn] ${mode} EMPTY transcript (stt ${sttMs}ms) -> "Kuch sunai nahi diya."`);
       return res.json({ transcript: '', intent: emptyIntent(), reply_text: 'Kuch sunai nahi diya.', reply_audio_url: null, changed: false });
     }
 
+    const r0 = Date.now();
     const intent = await route(transcript);
+    console.log(`[turn] ${mode} stt:${sttMs}ms route:${Date.now() - r0}ms  "${transcript}" -> ${intent.type}${intent.amount != null ? ` ₹${intent.amount}` : ''}${intent.item ? ` ${intent.item}` : ''}${intent.direction ? ` dir=${intent.direction}` : ''}`);
     const result = await applyIntent(intent, { mode });
 
     let reply_audio_url = null;
@@ -77,7 +83,36 @@ app.get('/state', (req, res) => {
     contacts: store.contacts,
     items: store.items,
     upi_txns: store.upiTxns,
+    // proactive layer: agent-initiated suggestions + a one-line briefing
+    suggestions: computeSuggestions(),
+    briefing: briefingText(),
   });
+});
+
+// POST /suggest/act { suggestion_id } -> fire a proactive suggestion (owner's one-tap consent).
+// Reuses the existing collect/procure senders: WhatsApp + a simulated Hindi call.
+app.post('/suggest/act', async (req, res) => {
+  const { suggestion_id } = req.body || {};
+  const sug = computeSuggestions().find((s) => s.id === suggestion_id);
+  if (!sug) return res.status(404).json({ error: `suggestion '${suggestion_id}' not found (maybe already actioned)` });
+  const todo = findTodo(sug.todo_id);
+  if (!todo) return res.status(404).json({ error: `todo '${sug.todo_id}' not found` });
+
+  if (sug.kind === 'collect') {
+    const message = await sendCollection(todo);
+    const call = await simulateCall('collection', { name: todo.customer, amount: todo.amount, phone: todo.phone });
+    todo.reminded = true;
+    return res.json({ suggestion: sug, message, call, todo });
+  }
+  // restock
+  const supplier = theSupplier();
+  if (!supplier) return res.status(400).json({ error: 'no supplier configured in seed' });
+  const itemsLine = todo.qty ? `${todo.qty} ${todo.item}` : todo.item || todo.text;
+  const message = await sendOrder(supplier, itemsLine);
+  const call = await simulateCall('order', { name: supplier.name, phone: supplier.phone, itemsLine });
+  todo.ordered = true;
+  todo.status = 'done';
+  return res.json({ suggestion: sug, message, call, todo });
 });
 
 // POST /collect/confirm { udhaar_id } -> { message }  (tap-to-send, WhatsApp only)
@@ -166,9 +201,16 @@ app.post('/reminders/cancel', (req, res) => {
 });
 
 // --- dev helpers ---
-app.get('/health', (req, res) => res.json({ ok: true, models: config.models, speaker: config.ttsSpeaker, whatsapp: config.whatsappMode }));
+app.get('/health', (req, res) => res.json({
+  ok: true,
+  models: config.models,
+  speaker: config.ttsSpeaker,
+  whatsapp: config.whatsappMode,
+  router: config.router === 'groq' && config.groq.key ? `groq:${config.groq.model}` : `sarvam:${config.models.llm}`,
+}));
 app.post('/reset', (req, res) => { loadSeed(); res.json({ ok: true, eod: computeEod() }); });
 
 app.listen(config.port, () => {
-  console.log(`Galla backend on http://localhost:${config.port}  (models: ${JSON.stringify(config.models)}, whatsapp: ${config.whatsappMode})`);
+  const router = config.router === 'groq' && config.groq.key ? `groq:${config.groq.model}` : `sarvam:${config.models.llm}`;
+  console.log(`Galla backend on http://localhost:${config.port}  (router: ${router}, stt: ${config.models.stt}, tts: ${config.models.tts}/${config.ttsSpeaker}, whatsapp: ${config.whatsappMode})`);
 });

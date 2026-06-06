@@ -4,7 +4,8 @@
     { "id": "c2", "name": "Suresh Patel", "phone": "+919812345672" },
     { "id": "c3", "name": "Anita Sharma", "phone": "+919812345673" },
     { "id": "c4", "name": "Vijay Singh", "phone": "+919812345674" },
-    { "id": "c5", "name": "Pooja Verma", "phone": "+919812345675" }
+    { "id": "c5", "name": "Pooja Verma", "phone": "+919812345675" },
+    { "id": "c6", "name": "Ritvik", "phone": "+919812345676" }
   ],
   "suppliers": [
     { "id": "s1", "name": "Verma Distributors", "phone": "+919800000001", "supplies": "general kirana — cheeni, doodh, atta, chawal, tea, oil" }
