@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { store } from './store.js';
 import { hindiToNumber } from './hindi.js';
 
-const TYPES = ['log_sale', 'log_udhaar', 'log_miss', 'set_reminder', 'query', 'mark_done', 'unknown'];
+const TYPES = ['log_sale', 'log_udhaar', 'log_miss', 'set_reminder', 'send_reminder', 'query', 'mark_done', 'unknown'];
 const QKINDS = ['today_total', 'what_owed', 'cash_vs_upi', null];
 const DIRS = ['in', 'out', 'unclear', null];
 const empty = () => ({
@@ -23,7 +23,7 @@ The shopkeeper speaks Hindi / Hinglish (already transcribed to English). Read ON
 and output ONLY a single JSON object — no prose, no markdown fences.
 
 Schema (every key ALWAYS present; null when N/A):
-{ "type":"log_sale"|"log_udhaar"|"log_miss"|"set_reminder"|"query"|"mark_done"|"unknown",
+{ "type":"log_sale"|"log_udhaar"|"log_miss"|"set_reminder"|"send_reminder"|"query"|"mark_done"|"unknown",
   "amount":<number|null>, "pay_type":"cash"|"upi"|null, "item":<string|null>,
   "customer":<string|null>, "query_kind":"today_total"|"what_owed"|"cash_vs_upi"|null,
   "direction":"in"|"out"|"unclear"|null, "when":<string|null> }
@@ -32,7 +32,8 @@ Types:
 - log_sale  : money RECEIVED for a sale. set amount, pay_type (cash, or upi for "online/UPI/Paytm/GPay"), item, direction "in".
 - log_udhaar: credit / someone owes (udhaar, baaki, "likh do"). set amount, customer, item. pay_type null.
 - log_miss  : a wanted item is out of stock / reorder needed ("khatam ho gayi", "order kar do"). set item; amount=quantity if said.
-- set_reminder: owner wants to be reminded / remind a debtor at a TIME ("Ramesh ko 6 baje yaad dilana", "do minute baad reminder", "kal yaad dilana"). set customer, when (and amount/item if a new udhaar is also stated).
+- set_reminder: owner wants to remind a debtor at a FUTURE TIME ("Ramesh ko 6 baje yaad dilana", "do minute baad reminder", "kal yaad dilana"). set customer, when (and amount/item if a new udhaar is also stated).
+- send_reminder: owner wants to remind a debtor RIGHT NOW / immediately — phrases with "abhi", "turant", "abhi bhej do", "abhi message/reminder bhej do", "abhi yaad dila do", with NO future time. set customer (and amount if stated). when stays null.
 - query     : a question. query_kind="today_total" (kitna becha/kamaaya), "cash_vs_upi" ("aaj ka hisaab"), "what_owed" (kiska udhaar baaki).
 - mark_done : completing a to-do. identify via item or customer.
 - unknown   : anything else.
@@ -65,6 +66,8 @@ Examples:
 "Ramesh ko paanch sau ka udhaar likh do" -> {"type":"log_udhaar","amount":500,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null,"direction":null,"when":null}
 "Ramesh ko do minute baad yaad dilana" -> {"type":"set_reminder","amount":null,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null,"direction":null,"when":"in 2 minutes"}
 "Suresh ko 6 baje paise ka reminder bhejna" -> {"type":"set_reminder","amount":null,"pay_type":null,"item":null,"customer":"Suresh Patel","query_kind":null,"direction":null,"when":"today 18:00"}
+"Ramesh ko abhi reminder bhej do" -> {"type":"send_reminder","amount":null,"pay_type":null,"item":null,"customer":"Ramesh Kumar","query_kind":null,"direction":null,"when":null}
+"Suresh ko abhi paise ka message bhej do" -> {"type":"send_reminder","amount":null,"pay_type":null,"item":null,"customer":"Suresh Patel","query_kind":null,"direction":null,"when":null}
 "aaj ka hisaab" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"cash_vs_upi","direction":null,"when":null}
 "kiska udhaar baaki hai" -> {"type":"query","amount":null,"pay_type":null,"item":null,"customer":null,"query_kind":"what_owed","direction":null,"when":null}`;
 }

@@ -3,6 +3,8 @@
 import { store, nextId, nowIso, matchContact } from './store.js';
 import { speakEod, speakOwed } from './eod.js';
 import { schedule } from './scheduler.js';
+import { sendCollection } from './whatsapp.js';
+import { simulateCall } from './calls.js';
 import { parseWhen } from './time.js';
 
 function openCollectFor(name, id) {
@@ -86,6 +88,24 @@ export async function applyIntent(intent, { mode = 'text' } = {}) {
       schedule({ customer, customer_id: c?.id, phone, amount, item: intent.item || existing?.item || null, fireAt });
       const t = new Date(fireAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
       return { changed: true, reply_text: `⏰ Theek hai — ${customer} ko ${t} par WhatsApp aur call se yaad dila dunga.`, speak: false };
+    }
+
+    case 'send_reminder': {
+      // immediate reminder: WhatsApp (Paytm link) + a Hindi call, right now.
+      const c = matchContact(intent.customer);
+      const existing = openCollectFor(c?.name || intent.customer, c?.id);
+      const who = c?.name || intent.customer || 'Customer';
+      if (!existing) {
+        return { changed: false, reply_text: `${who} ka koi khula udhaar nahi mila — pehle "${who} ko ___ ka udhaar likh do" boliye.`, speak: false };
+      }
+      try {
+        await sendCollection(existing);
+        await simulateCall('collection', { name: existing.customer, amount: existing.amount, phone: existing.phone });
+        existing.reminded = true;
+        return { changed: true, reply_text: `📲 ${existing.customer} ko abhi ₹${existing.amount} ka reminder WhatsApp aur call se bhej diya.`, speak: false };
+      } catch (e) {
+        return { changed: true, reply_text: `${existing.customer} ko reminder bhejne mein dikkat aayi — dobara koshish karein.`, speak: false };
+      }
     }
 
     case 'mark_done': {
