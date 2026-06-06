@@ -34,7 +34,6 @@ export default function App() {
   const nudgeId = useRef(0);
   const voiceLevelRef = useRef(0);     // shared mic level -> the orb (orb has no mic of its own)
   const meterStopRef = useRef(null);
-  const getStreamRef = useRef(null);   // returns the wake engine's live mic stream
 
   const refresh = useCallback(async () => {
     try { setState(await api.state()); setOnline(true); } catch { setOnline(false); }
@@ -128,36 +127,16 @@ export default function App() {
     if (recRef.current && recRef.current.state !== 'inactive') recRef.current.stop();
   }, []);
 
-  // wake fired: chime + activation, then record the command FROM THE ENGINE'S OWN STREAM
-  // (no new getUserMedia, engine keeps running -> re-arms every time).
+  // wake fired: chime + activation, then capture the command (own mic) and reply
   const onWake = useCallback(async () => {
     if (recRef.current) return;
-    const stream = getStreamRef.current?.();
-    if (!stream) return;
     playChime();
     setActivated(true);
-    const stopMeter = attachMeter(stream);
-    const mime = pickAudioMime();
-    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    const chunks = [];
-    rec.ondataavailable = (e) => e.data?.size && chunks.push(e.data);
-    rec.onstop = async () => {
-      stopMeter();
-      recRef.current = null;
-      setRecording(false);
-      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-      if (blob.size > 0) await sendTurn({ mode: 'wake', audioBase64: await blobToBase64(blob) });
-      else setActivated(false);
-      // NOTE: never stop the stream tracks here — the wake engine owns this stream
-    };
-    rec.start();
-    recRef.current = rec;
-    setRecording(true);
-    setTimeout(() => rec.state !== 'inactive' && rec.stop(), WAKE_CAPTURE_MS);
-  }, [attachMeter, sendTurn]);
+    await startRec();
+    setTimeout(stopRec, WAKE_CAPTURE_MS);
+  }, [startRec, stopRec]);
 
-  const { status: wakeStatus, getStream } = useWakeWord({ enabled: mode === 'talk', onWake });
-  getStreamRef.current = getStream;
+  const { status: wakeStatus } = useWakeWord({ enabled: mode === 'talk', onWake });
 
   // ambient / Listen: continuous chunks, log-only, bottom nudge (no spoken reply); feeds the orb level
   useEffect(() => {
