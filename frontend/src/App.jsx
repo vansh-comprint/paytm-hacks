@@ -26,6 +26,7 @@ export default function App() {
   const [activated, setActivated] = useState(false);
   const [nudges, setNudges] = useState([]);
   const [busyTodo, setBusyTodo] = useState('');
+  const [dismissedMsgs, setDismissedMsgs] = useState(() => new Set());
 
   const audioRef = useRef(null);
   const streamRef = useRef(null);
@@ -215,6 +216,7 @@ export default function App() {
     setBusyTodo(t.id);
     try { await api.collectConfirm(t.id); await refresh(); } catch { setOnline(false); } finally { setBusyTodo(''); }
   };
+  const dismissMsg = (id) => setDismissedMsgs((s) => { const n = new Set(s); n.add(id); return n; });
 
   return (
     <div className="min-h-dvh bg-counter">
@@ -273,7 +275,7 @@ export default function App() {
             <Ledger sales={state.sales} />
             <div className="grid gap-5">
               <LooseEnds todos={state.todos} onSendReminder={sendReminder} onMarkDone={markDone} busyId={busyTodo} />
-              <WhatsAppSent messages={state.messages} />
+              <WhatsAppSent messages={state.messages.filter((m) => !dismissedMsgs.has(m.id))} onDismiss={dismissMsg} />
             </div>
           </div>
 
