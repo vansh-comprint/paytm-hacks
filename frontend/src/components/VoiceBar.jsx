@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mic, Send, AudioLines } from 'lucide-react';
+import ModeSwitch from './ModeSwitch.jsx';
 
-// The ask: type or speak to your munshi. Hold-to-talk is the demo-safe FLOOR;
-// the toggle enables hands-free "Hey Paytm" listening.
+// Capture bar: text + hold-to-talk (the FLOOR) + the Off/Listen/Talk mode switch.
 export default function VoiceBar({
-  onSendText, recording, onMicDown, onMicUp,
-  wakeEnabled, onToggleWake, wakeStatus, busy,
+  onSendText, recording, onMicDown, onMicUp, mode, onMode, wakeStatus, busy,
 }) {
   const [text, setText] = useState('');
   const submit = () => {
@@ -15,6 +14,11 @@ export default function VoiceBar({
     onSendText(t);
     setText('');
   };
+
+  const hint =
+    mode === 'talk' ? `Say “Hey Jarvis” · ${wakeStatus}`
+    : mode === 'listen' ? 'Ambient — Galla logs quietly, no reply'
+    : 'Hold to talk is the demo-safe path';
 
   return (
     <section aria-label="Talk to Galla" className="grid gap-3">
@@ -57,19 +61,9 @@ export default function VoiceBar({
         </motion.button>
       </div>
 
-      <div className="flex items-center justify-between px-1 text-[12px]">
-        <label className="inline-flex cursor-pointer items-center gap-2 text-ink-soft">
-          <input
-            type="checkbox"
-            checked={wakeEnabled}
-            onChange={onToggleWake}
-            className="h-3.5 w-3.5 accent-[var(--color-brand)]"
-          />
-          Hands-free wake word
-        </label>
-        <span className="text-muted">
-          {wakeEnabled ? wakeStatus : 'manual mic is the demo-safe path'}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <ModeSwitch mode={mode} onMode={onMode} />
+        <span className={`text-[12px] ${mode === 'listen' ? 'text-wa' : 'text-muted'}`}>{hint}</span>
       </div>
     </section>
   );

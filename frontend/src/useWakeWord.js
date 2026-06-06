@@ -33,7 +33,7 @@ export function useWakeWord({ enabled, onWake }) {
       ortWasmPath: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/',
       modelFiles: MODEL_FILES,
       keywords: [ACTIVE_KEYWORD],
-      detectionThreshold: 0.5,
+      detectionThreshold: 0.4, // a bit more sensitive so "hey jarvis" fires reliably
       cooldownMs: 2500, // avoid double-fire on one utterance
     });
 
