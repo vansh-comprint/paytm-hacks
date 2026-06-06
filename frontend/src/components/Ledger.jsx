@@ -30,8 +30,8 @@ export default function Ledger({ sales }) {
                 <motion.li
                   key={s.id}
                   layout
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ y: -8 }}
+                  animate={{ y: 0 }}
                   transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                   className="flex items-center gap-3 border-b border-line-soft px-4 py-3 last:border-b-0"
                 >

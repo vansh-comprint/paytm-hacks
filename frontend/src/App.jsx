@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { api, blobToBase64, pickAudioMime } from './api.js';
 import { useWakeWord } from './useWakeWord.js';
 import Brandmark from './components/Brandmark.jsx';
@@ -137,20 +136,15 @@ export default function App() {
             busy={busy}
           />
 
-          <AnimatePresence>
-            {reply && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="rounded-[var(--radius)] border border-line bg-[oklch(0.97_0.018_235)] px-4 py-3"
-              >
-                {reply.transcript && <p className="text-[12.5px] italic text-muted">“{reply.transcript}”</p>}
-                <p className="mt-0.5 deva text-[15px] font-medium leading-relaxed text-ink">{reply.reply_text}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {reply && (
+            <div
+              key={reply.reply_text}
+              className="animate-fade-up rounded-[var(--radius)] border border-line bg-[oklch(0.97_0.018_235)] px-4 py-3"
+            >
+              {reply.transcript && <p className="text-[12.5px] italic text-muted">“{reply.transcript}”</p>}
+              <p className="mt-0.5 deva text-[15px] font-medium leading-relaxed text-ink">{reply.reply_text}</p>
+            </div>
+          )}
 
           <Reveal eod={state.eod} onSpeak={speakEod} speaking={speaking || busy} />
 

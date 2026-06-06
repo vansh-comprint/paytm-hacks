@@ -16,8 +16,9 @@ export default function Reveal({ eod, onSpeak, speaking }) {
     );
   }
   const total = eod.total || 0;
-  const cashPct = total ? Math.max(4, Math.round((eod.cash / total) * 100)) : 0;
-  const upiPct = total ? Math.min(96, 100 - cashPct) : 0;
+  const hasCash = (eod.cash || 0) > 0;
+  const cashPct = hasCash && total ? Math.max(4, Math.round((eod.cash / total) * 100)) : 0;
+  const upiPct = total ? 100 - cashPct : 0;
 
   const facts = [
     `${eod.sale_count} sales`,
@@ -26,11 +27,8 @@ export default function Reveal({ eod, onSpeak, speaking }) {
   ].filter(Boolean);
 
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: EXPO }}
-      className="relative overflow-hidden rounded-[var(--radius)] border border-line bg-panel p-6 sm:p-7 shadow-[0_1px_0_oklch(1_0_0/0.7)_inset,0_24px_60px_-40px_oklch(0.3_0.1_250/0.55)]"
+    <section
+      className="animate-fade-up relative overflow-hidden rounded-[var(--radius)] border border-line bg-panel p-6 sm:p-7 shadow-[0_1px_0_oklch(1_0_0/0.7)_inset,0_24px_60px_-40px_oklch(0.3_0.1_250/0.55)]"
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
@@ -47,11 +45,19 @@ export default function Reveal({ eod, onSpeak, speaking }) {
       </div>
 
       {/* the reconciliation sentence */}
-      <p className="font-display text-[1.35rem] leading-snug text-ink-soft sm:text-[1.55rem]">
-        Paytm saw <span className="font-bold tnum text-upi">{inr(eod.upi)}</span> online.
-        <br className="hidden sm:block" />{' '}
-        Galla heard <span className="font-bold tnum text-cash-ink">{inr(eod.cash)}</span> more in cash. The part no app saw.
-      </p>
+      {hasCash ? (
+        <p className="font-display text-[1.35rem] leading-snug text-ink-soft sm:text-[1.55rem]">
+          Paytm saw <span className="font-bold tnum text-upi">{inr(eod.upi)}</span> online.
+          <br className="hidden sm:block" />{' '}
+          Galla heard <span className="font-bold tnum text-cash-ink">{inr(eod.cash)}</span> more in cash. The part no app saw.
+        </p>
+      ) : (
+        <p className="font-display text-[1.35rem] leading-snug text-ink-soft sm:text-[1.55rem]">
+          Paytm sees <span className="font-bold tnum text-upi">{inr(eod.upi)}</span> online so far.
+          <br className="hidden sm:block" />{' '}
+          The cash drawer is still dark. Log a cash sale and Galla lights up what Paytm can’t see.
+        </p>
+      )}
 
       {/* the true day — the figure as the climax, not a labelled stat box */}
       <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -61,27 +67,16 @@ export default function Reveal({ eod, onSpeak, speaking }) {
 
       {/* tactile till bar: cash is "found" second */}
       <div className="mt-5 flex h-3.5 w-full overflow-hidden rounded-full bg-[oklch(0.93_0.01_245)]">
-        <motion.span
-          className="block h-full bg-upi"
-          style={{ width: `${upiPct}%`, transformOrigin: 'left' }}
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 0.7, ease: EXPO, delay: 0.15 }}
-        />
-        <motion.span
-          className="block h-full bg-cash"
-          style={{ width: `${cashPct}%`, transformOrigin: 'left' }}
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 0.6, ease: EXPO, delay: 0.65 }}
-        />
+        <span className="grow-x block h-full bg-upi" style={{ width: `${upiPct}%`, animationDelay: '0.12s' }} />
+        <span className="grow-x block h-full bg-cash" style={{ width: `${cashPct}%`, animationDelay: '0.55s' }} />
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px]">
         <span className="inline-flex items-center gap-1.5 text-muted">
           <i className="h-2.5 w-2.5 rounded-full bg-upi" /> Online {inr(eod.upi)}
         </span>
-        <span className="inline-flex items-center gap-1.5 font-medium text-cash-ink">
-          <i className="h-2.5 w-2.5 rounded-full bg-cash" /> Cash {inr(eod.cash)} · {cashPct}% they were blind to
+        <span className={`inline-flex items-center gap-1.5 ${hasCash ? 'font-medium text-cash-ink' : 'text-muted'}`}>
+          <i className="h-2.5 w-2.5 rounded-full bg-cash" /> Cash {inr(eod.cash)}
+          {hasCash ? ` · ${cashPct}% they were blind to` : ' · still dark'}
         </span>
       </div>
 
@@ -95,6 +90,6 @@ export default function Reveal({ eod, onSpeak, speaking }) {
           {eod.misses.length} asked for <b>{eod.misses.join(', ')}</b> you didn’t have.
         </p>
       )}
-    </motion.section>
+    </section>
   );
 }

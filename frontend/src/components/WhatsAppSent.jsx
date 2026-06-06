@@ -20,8 +20,8 @@ export default function WhatsAppSent({ messages }) {
         {rows.map((m) => (
           <motion.div
             key={m.id}
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ y: -6 }}
+            animate={{ y: 0 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="rounded-[var(--radius)] border border-line bg-panel p-3.5"
           >

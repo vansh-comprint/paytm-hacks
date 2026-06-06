@@ -45,6 +45,13 @@ body {
 @utility tnum { font-variant-numeric: tabular-nums; }
 @utility deva { font-family: var(--font-deva); font-feature-settings: normal; }
 
+/* Entrance motion as CSS, never JS — content is never gated on an animation completing
+   (reliable headless + respects the reduced-motion block below). */
+@keyframes fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.animate-fade-up { animation: fade-up 0.55s var(--ease-out-expo) both; }
+.grow-x { transform-origin: left; animation: grow-x 0.7s var(--ease-out-expo) both; }
+
 /* hide scrollbar on the inner feeds but keep scroll */
 .soft-scroll { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
 
