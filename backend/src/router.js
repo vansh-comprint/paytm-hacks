@@ -1,6 +1,9 @@
-// Intent router: one Sarvam-LLM call turns a transcript into the contract's Intent JSON.
+// Intent router: one LLM call turns a transcript into the contract's Intent JSON.
 // The contacts + items lists are injected into the prompt so names/items match the ledger.
-import { chat } from './sarvam.js';
+// LLM = Groq (fast, non-reasoning) by default; Sarvam reasoning LLM is the fallback.
+import { chat as sarvamChat } from './sarvam.js';
+import * as groq from './groq.js';
+import { config } from './config.js';
 import { store } from './store.js';
 import { hindiToNumber } from './hindi.js';
 
@@ -67,10 +70,12 @@ Examples:
 }
 
 function extractJson(text) {
-  let t = (text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  const m = t.match(/\{[\s\S]*\}/);
-  if (m) t = m[0];
-  try { return JSON.parse(t); } catch { return null; }
+  const t = (text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const m = t.match(/\{[\s\S]*\}/); // greedy first-{ to last-}
+  try { return JSON.parse(m ? m[0] : t); } catch { /* try the last object below */ }
+  const i = t.lastIndexOf('{'); // recover when prose/example braces precede the real object
+  if (i > 0) { try { return JSON.parse(t.slice(i)); } catch { /* fall through */ } }
+  return null;
 }
 
 function normalize(raw, transcript) {
@@ -100,20 +105,26 @@ function normalize(raw, transcript) {
   return out;
 }
 
+// Try Groq first (fast, reliable JSON). If it errors (e.g. rate-limit/outage) fall back to
+// the Sarvam reasoning LLM (slow but available). max_tokens=4096 is the starter-tier ceiling.
+async function llmRoute(messages) {
+  if (config.router === 'groq' && groq.hasKey()) {
+    try { return await groq.chat(messages, { temperature: 0, max_tokens: 400 }); }
+    catch (e) { console.warn(`[router] Groq failed, falling back to Sarvam: ${e.message}`); }
+  }
+  return sarvamChat(messages, { temperature: 0, max_tokens: 4096 });
+}
+
 export async function route(transcript) {
   if (!transcript || !transcript.trim()) return empty();
   let content;
   try {
-    // sarvam-30b is a reasoning model — give it room so reasoning_content doesn't
-    // eat the whole budget before it emits the final JSON (finish_reason: length).
-    content = await chat(
-      [
-        { role: 'system', content: systemPrompt() },
-        { role: 'user', content: transcript },
-      ],
-      { temperature: 0, max_tokens: 3000 },
-    );
-  } catch {
+    content = await llmRoute([
+      { role: 'system', content: systemPrompt() },
+      { role: 'user', content: transcript },
+    ]);
+  } catch (e) {
+    console.warn(`[router] LLM route failed: ${e.message}`);
     return empty();
   }
   return normalize(extractJson(content), transcript);

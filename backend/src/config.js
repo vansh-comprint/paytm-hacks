@@ -2,16 +2,27 @@ import 'dotenv/config';
 
 // Models verified live against the Sarvam key on 2026-06-06.
 // NOTE: AGENTS.md §5 lists LLM `sarvam-m` — that is DEPRECATED. Current: sarvam-30b / sarvam-105b.
+// SPEECH (STT/TTS) = Sarvam; REASONING (intent router LLM) = Groq. Sarvam's only LLMs are
+// reasoning models (sarvam-30b/105b) that burn the token budget on hidden reasoning and
+// stall 10–140s / intermittently truncate to empty — unusable for a real-time voice router.
+// Groq's llama-3.3-70b answers the same prompt in ~350ms with reliable JSON.
 export const config = {
   port: Number(process.env.PORT || 8000),
   sarvamKey: process.env.SARVAM_API_KEY || '',
   models: {
     stt: process.env.SARVAM_STT_MODEL || 'saaras:v2.5', // Saaras: auto-detect + translate to English
-    llm: process.env.SARVAM_LLM_MODEL || 'sarvam-30b',  // or sarvam-105b
+    llm: process.env.SARVAM_LLM_MODEL || 'sarvam-30b',  // Sarvam LLM (router FALLBACK only; or sarvam-105b)
     tts: process.env.SARVAM_TTS_MODEL || 'bulbul:v3',   // latest Bulbul
   },
   ttsSpeaker: process.env.SARVAM_TTS_SPEAKER || 'priya', // valid for bulbul:v3 (anushka is v2-only)
   replyLang: process.env.REPLY_LANG || 'hi-IN',          // Galla talks back in Hindi
+
+  // Intent router LLM: Groq (fast, non-reasoning) is primary; Sarvam is the fallback.
+  router: process.env.ROUTER_PROVIDER || 'groq', // 'groq' | 'sarvam'
+  groq: {
+    key: process.env.GROQ_API_KEY || '',
+    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  },
 
   // WhatsApp: mock card by default; real send via the local OpenWA gateway when WHATSAPP_MODE=openwa
   whatsappMode: process.env.WHATSAPP_MODE || 'mock',
